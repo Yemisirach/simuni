@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: simuni_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: simuni_admin
+      POSTGRES_PASSWORD: simuni_secure_pass_123
+      POSTGRES_DB: simuni_prod
+    ports:
+      - "5432:5432"
+    volumes:
+      - simuni_db_data:/var/lib/postgresql/data
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: simuni_backend
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://simuni_admin:simuni_secure_pass_123@db:5432/simuni_prod?schema=public
+      - BETTER_AUTH_SECRET=your_super_secret_key_change_me
+      - BETTER_AUTH_URL=http://localhost:3000
+    ports:
+      - "3000:3000"
+
+  web:
+    build: 
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: simuni_web
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+    ports:
+      - "3001:3000" # Next.js default is 3000, mapped to 3001 on host
+
+volumes:
+  simuni_db_data:

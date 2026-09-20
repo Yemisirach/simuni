@@ -1,0 +1,44 @@
+DATABASE_URL="postgresql://simuni:simuni@localhost:5432/simuni?schema=public"
+REDIS_URL="redis://localhost:6379"
+
+# Better Auth
+BETTER_AUTH_SECRET="change-me-to-a-long-random-string"
+BETTER_AUTH_URL="http://localhost:3000"
+# Comma-separated origins allowed to make credentialed auth requests
+# (Expo dev server + any web dashboard origins).
+TRUSTED_ORIGINS="http://localhost:19006,http://localhost:8081"
+
+MINIO_ENDPOINT="localhost"
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ACCESS_KEY="minioadmin"
+MINIO_SECRET_KEY="minioadmin"
+MINIO_BUCKET="simuni-invoices"
+
+OSRM_URL="http://localhost:5000"
+
+# telebirr (Ethio Telecom Fabric Payment Gateway) — see backend/src/payments/telebirr.service.ts
+# for exactly what's verified vs. best-effort about this integration.
+# TELEBIRR_ENV: "test" (default) or "production" — selects the base URLs.
+TELEBIRR_ENV="test"
+TELEBIRR_FABRIC_APP_ID="your-fabric-app-id"
+TELEBIRR_APP_SECRET="your-app-secret"
+TELEBIRR_MERCHANT_APP_ID="your-merchant-app-id"
+TELEBIRR_MERCHANT_CODE="your-short-code"
+# PEM strings. If storing in a single-line .env value, use \n for newlines
+# (the code un-escapes them) — better yet, load these from a secrets
+# manager in production rather than a .env file.
+TELEBIRR_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+TELEBIRR_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+TELEBIRR_NOTIFY_URL="https://your-domain.com/api/v1/payments/telebirr/notify"
+TELEBIRR_RETURN_URL="https://your-domain.com/api/v1/payments/telebirr/return"
+
+PORT=3000
+
+# Telegram ordering bot (see backend/src/telegram/telegram.service.ts)
+# Create a bot via @BotFather on Telegram to get a token. Leave unset to
+# disable this channel entirely — the rest of the app is unaffected.
+TELEGRAM_BOT_TOKEN=""
+# Your bot's @username, used only to build the shareable ordering links
+# printed by `GET /workspace/telegram-link` (e.g. t.me/SimuniOrderBot).
+TELEGRAM_BOT_USERNAME="SimuniOrderBot"

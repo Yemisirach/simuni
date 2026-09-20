@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Simuni Agent",
+    "slug": "simuni-agent",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0F7A5C"
+    },
+    "android": {
+      "package": "com.simuni.agent",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION"]
+    },
+    "ios": {
+      "bundleIdentifier": "com.simuni.agent",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Simuni needs your location to track delivery routes.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Simuni tracks your location during active routes."
+      }
+    }
+  }
+}

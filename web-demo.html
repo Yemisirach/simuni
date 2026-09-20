@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simuni — Field Sales &amp; Delivery Console</title>
+<style>
+  :root{
+    --primary: #1A1A1A;
+    --primary-dark: #111111;
+    --primary-darker: #0A0A0A;
+    --accent: #C4A35A;
+    --accent-light: #E8D5A8;
+    --accent-muted: #FDF6E3;
+    --bg: #F5F5F3;
+    --surface: #FFFFFF;
+    --text: #1A1A1A;
+    --text-muted: #6B6B6B;
+    --border: #E5E5E3;
+    --danger: #D64545;
+    --success: #1F9D55;
+    --warning: #E5A100;
+    --osrm: #0F7A5C;
+    --telebirr: #5E2A8C;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{ font-family:Georgia,Cambria,"Times New Roman",serif; }
+  .mono { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Menlo', monospace; }
+  
+  #app{ display:flex; flex-direction:column; min-height:100vh; }
+
+  /* ---------- Top Navigation ---------- */
+  .topnav {
+    background: var(--primary-darker);
+    color: #fff;
+    padding: 0 24px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    border-bottom: 1px solid #222;
+  }
+  .nav-left { display: flex; align-items: center; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 8px; background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif; font-weight: 700; color: var(--primary-darker); font-size: 18px;
+  }
+  .brand-name { font-family: Georgia, serif; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  .badge-gold {
+    background: var(--accent); color: var(--primary-darker);
+    font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 4px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  .nav-center {
+    display: flex; align-items: center; gap: 8px;
+    flex: 1; justify-content: center;
+  }
+  .tenant-dropdown {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    margin-right: 16px; cursor: pointer;
+  }
+  .nav-item {
+    background: transparent; border: none; color: #aaa;
+    font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 8px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .nav-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  .nav-item.active { color: var(--accent); background: rgba(196,163,90,0.1); }
+  
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .telebirr-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(94,42,140,0.2); border: 1px solid var(--telebirr);
+    color: #E2D4F0; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .telebirr-dot { width: 6px; height: 6px; background: #9D4EDD; border-radius: 50%; box-shadow: 0 0 6px #9D4EDD; }
+  .avatar-circle {
+    width: 34px; height: 34px; border-radius: 50%; background: #333;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; color: #fff; border: 2px solid var(--border);
+    cursor: pointer;
+  }
+
+  /* ---------- Main ---------- */
+  .main{ flex:1; max-width:1400px; margin:0 auto; padding:28px 34px; width: 100%; }
+  
+  .breadcrumb { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .page-header{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px; }
+  .page-title{ font-size:26px; font-weight:700; margin:0 0 4px 0; }
+  .page-sub{ color:var(--text-muted); font-size:13.5px; margin:0; }
+  
+  .status-row { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+  .status-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-muted); background: #EAEAEA; padding: 4px 8px; border-radius: 6px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-dot.green { background: var(--success); }
+  .status-dot.gold { background: var(--accent); }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; border:none; cursor:pointer;
+    font-weight:600; font-size:13.5px; padding:10px 16px; border-radius:10px;
+    background:var(--primary); color:#fff; transition:background .15s ease;
+  }
+  .btn:hover{ background:var(--primary-dark); }
+  .btn.gold { background: var(--accent); color: var(--primary-darker); }
+  .btn.gold:hover { background: #b3924a; }
+  .btn.secondary{ background:var(--surface); color:var(--text); border:1px solid var(--border); }
+  .btn.secondary:hover{ background:#EFF3F1; }
+  .btn.danger{ background:var(--danger); }
+  .btn.small{ padding:6px 11px; font-size:12.5px; border-radius:8px; }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  /* ---------- Stat cards ---------- */
+  .stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:26px; }
+  .stat-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+  .stat-label{ font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+  .stat-value{ font-size:28px; font-weight:800; margin-top:6px; }
+  .stat-sub { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .stat-trend { color: var(--success); font-weight: 600; }
+
+  /* ---------- Panels & Layouts ---------- */
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+  .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .two-col-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+  .three-col-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 24px; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  th{ text-align:left; padding:12px 16px; background:#FAFBFA; color:var(--text-muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--border); }
+  td{ padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:nth-child(even) td { background: #FCFCFC; }
+  tr:last-child td{ border-bottom:none; }
+  .empty-state{ padding:40px 20px; text-align:center; color:var(--text-muted); font-size:14px; }
+
+  .badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:700; }
+  .badge.green{ background:#E4F6E9; color:#177A3E; }
+  .badge.amber{ background:#FFF3DC; color:#9A6B00; }
+  .badge.gray{ background:#EEF1F0; color:var(--text-muted); }
+  .badge.red{ background:#FDECEC; color:#B23A3A; }
+  .badge.gold{ background:var(--accent-light); color:var(--primary-darker); }
+
+  .avatar-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; box-shadow: 0 0 0 2px #fff; }
+  .avatar-dot.on{ background:var(--success); animation: pulse 2s infinite; }
+  .avatar-dot.off{ background:#C7CFCB; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(31, 157, 85, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(31, 157, 85, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(31, 157, 85, 0); }
+  }
+
+  /* ---------- Route / Manifest cards ---------- */
+  .route-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; padding: 20px; }
+  .route-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; cursor:pointer; transition:box-shadow .15s ease, transform .15s ease, border-color .15s; }
+  .route-card:hover{ box-shadow:0 6px 18px rgba(196,163,90,0.12); transform:translateY(-2px); border-color: var(--accent); }
+  .route-card-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+  .route-name{ font-weight:700; font-size:16px; margin-bottom: 4px; }
+  .route-meta{ font-size:12.5px; color:var(--text-muted); }
+  .progress-track{ background:#EEF1F0; border-radius:999px; height:6px; overflow:hidden; margin: 12px 0; }
+  .progress-fill{ background:var(--accent); height:100%; border-radius:999px; transition: width 0.3s ease; }
+  .route-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+  /* Maps & specific panels */
+  .map-placeholder { background: #E5E9EA; height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; position: relative; overflow: hidden; }
+  .map-placeholder::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(#d0d0d0 1px, transparent 1px); background-size: 20px 20px; opacity: 0.5; }
+  .map-placeholder div { position: relative; z-index: 1; text-align: center; }
+  
+  .sector-tabs { display: flex; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .pill-tab { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; background: #EEF1F0; color: var(--text-muted); border: none; }
+  .pill-tab.active { background: var(--primary); color: #fff; }
+
+  /* Route detail specific */
+  .waypoint-manifest { max-height: 500px; overflow-y: auto; }
+  .stop-row{ display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); }
+  .stop-row:last-child{ border-bottom:none; }
+  .stop-drag { cursor: grab; color: #ccc; font-size: 18px; }
+  .stop-num{ width:28px; height:28px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; flex-shrink:0; }
+  .stop-num.done{ background:var(--success); }
+  .stop-name{ font-weight:600; font-size:14px; }
+  .stop-address{ font-size:12px; color:var(--text-muted); margin-top: 2px; }
+
+  .diag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+  .diag-item { background: #FAFBFA; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+  .diag-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; font-weight: 600; }
+  .diag-val { font-size: 14px; font-weight: 700; }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(10,10,10,0.6); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; backdrop-filter: blur(2px); }
+  .modal{ background:var(--surface); border-radius:var(--radius-lg); width:100%; max-width:480px; max-height:88vh; overflow-y:auto; padding:26px; position:relative; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+  .modal.wide{ max-width:640px; }
+  .modal-close{ position:absolute; top:16px; right:18px; background:none; border:none; font-size:24px; color:var(--text-muted); cursor:pointer; line-height:1; }
+  .modal h2{ font-size:22px; margin:0 0 6px 0; }
+  .modal-sub{ font-size:13px; color:var(--text-muted); margin:0 0 20px 0; }
+
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; font-weight:600; color:var(--text-muted); margin-bottom:6px; }
+  .field input, .field select, .field textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
+    font-size:14px; font-family:inherit; color:var(--text); background:#fff; transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+  .checkbox-list{ max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:8px 10px; }
+  .checkbox-row{ display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13.5px; cursor: pointer; }
+
+  .cart-row{ display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); }
+  .cart-row:last-child{ border-bottom:none; }
+  .cart-name{ font-size:14px; font-weight:600; }
+  .cart-price{ font-size:12px; color:var(--text-muted); margin-top: 2px; }
+  .stepper{ display:flex; align-items:center; gap:10px; }
+  .stepper button{ width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:#fff; font-size:16px; font-weight:700; color:var(--primary); cursor:pointer; }
+  .stepper span{ min-width:20px; text-align:center; font-weight:700; }
+  .qty-input{ width:46px; text-align:center; font-weight:700; font-size:14px; padding:5px 2px; border:1px solid var(--border); border-radius:6px; color:var(--text); -moz-appearance:textfield; }
+  .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button{ margin:0; }
+  .custom-product-form{ background:var(--bg); border:1px dashed var(--border); border-radius:10px; padding:16px; margin-top:16px; }
+  .cart-total-row{ display:flex; justify-content:space-between; padding-top:16px; margin-top:8px; border-top:2px solid var(--border); font-weight:800; font-size:18px; }
+
+  .timeline-step{ display:flex; align-items:center; gap:12px; padding:12px 0; position: relative; }
+  .timeline-step:not(:last-child)::after { content: ""; position: absolute; left: 6px; top: 32px; bottom: -8px; width: 2px; background: var(--border); }
+  .timeline-step.done:not(:last-child)::after { background: var(--primary); }
+  .timeline-dot{ width:14px; height:14px; border-radius:50%; background:var(--border); flex-shrink:0; position: relative; z-index: 2; }
+  .timeline-dot.done{ background:var(--primary); box-shadow: 0 0 0 3px rgba(26,26,26,0.1); }
+  .timeline-label{ font-size:14px; color:var(--text-muted); }
+  .timeline-label.done{ color:var(--text); font-weight:700; }
+
+  .invoice-card{ border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; background: #fafafa; }
+  .invoice-line{ display:flex; justify-content:space-between; font-size:13.5px; padding:8px 0; border-bottom: 1px dashed var(--border); }
+  .invoice-total{ display:flex; justify-content:space-between; font-size:18px; font-weight:800; padding-top:16px; margin-top:8px; }
+
+  .toast{
+    position:fixed; bottom:32px; left:50%; transform:translateX(-50%);
+    background:var(--primary); color:#fff; padding:14px 24px; border-radius:999px;
+    font-size:14px; font-weight:600; box-shadow:0 12px 32px rgba(0,0,0,0.25); z-index:200;
+  }
+  
+  .link-btn{ background:none; border:none; color:var(--accent); font-weight:700; cursor:pointer; font-size:13px; padding:0; text-decoration: underline; }
+  .telebirr-btn{ background:#5E2A8C; }
+  .telebirr-btn:hover{ background:#4A2170; }
+  .telebirr-sheet{ text-align:center; padding:16px 0; }
+  .telebirr-logo{ font-family:Georgia,serif; font-weight:800; font-size:26px; color:#5E2A8C; margin-bottom:8px; }
+  .telebirr-amount{ font-size:36px; font-weight:800; color:var(--text); margin:12px 0 4px; font-family: 'SF Mono', monospace; }
+  .telebirr-to{ font-size:13px; color:var(--text-muted); margin-bottom:24px; }
+  .telebirr-processing{ padding:40px 0; color:#5E2A8C; font-weight:700; font-size:16px; }
+  .muted-note{ font-size:12px; color:var(--text-muted); margin-top:6px; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+  .system-footer { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; margin-top: 40px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .health-row { display: flex; gap: 16px; }
+  .health-item { display: flex; align-items: center; gap: 6px; }
+  
+  @media (max-width: 880px){
+    .stat-grid{ grid-template-columns:repeat(2,1fr); }
+    .two-col-layout, .three-col-layout { grid-template-columns: 1fr; }
+    .nav-center { display: none; }
+    .main{ padding:20px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ---------------------------------------------------------------- Utilities
+function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function esc(str){
+  return String(str == null ? '' : str).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+function money(n){ return 'ETB ' + Number(n||0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function today(){ return new Date(); }
+function isToday(d){
+  const t = today();
+  return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate();
+}
+function fmtDate(d){ return new Date(d).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}); }
+function fmtTime(d){ return new Date(d).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}); }
+
+// ---------------------------------------------------------------- Seed data
+const state = {
+  view: 'dashboard',
+  currentRouteId: null,
+  modal: null,
+  toast: null,
+  workspace: { name: 'Top Beverage Distribution', currency: 'ETB' },
+  agents: [
+    { id:'ag_1', name:'Dawit Alemu', phone:'0911000003', vehicle:'Motorbike - AA-12345', online:true },
+    { id:'ag_2', name:'Hana Girma', phone:'0911000004', vehicle:'Van - AA-98765', online:false },
+  ],
+  customers: [
+    { id:'cu_1', name:'Merkato Mini Market', phone:'0922000001', address:'Merkato, Addis Ababa', category:'Retail', lat:9.0357, lng:38.7469 },
+    { id:'cu_2', name:'Bole Cafe', phone:'0922000002', address:'Bole, Addis Ababa', category:'HORECA', lat:8.9930, lng:38.7920 },
+    { id:'cu_3', name:'Piassa Grocery', phone:'0922000003', address:'Piassa, Addis Ababa', category:'Retail', lat:9.0339, lng:38.7503 },
+  ],
+  products: [
+    { id:'pr_1', name:'Ambo Water 1L', unit:'crate', price:350 },
+    { id:'pr_2', name:'Coca-Cola 500ml', unit:'crate', price:480 },
+    { id:'pr_3', name:'Moha Soft Drink', unit:'crate', price:420 },
+  ],
+  routes: [
+    {
+      id:'rt_1', name:'Bole & Merkato Morning Run', date:new Date().toISOString(), agentId:'ag_1',
+      status:'PLANNED',
+      stops:[
+        { id:'st_1', customerId:'cu_1', sequence:1, status:'PENDING', visitedAt:null },
+        { id:'st_2', customerId:'cu_2', sequence:2, status:'PENDING', visitedAt:null },
+      ],
+    },
+  ],
+  orders: [],
+  deliveries: {},
+  invoices: [],
+};
+
+function customerById(id){ return state.customers.find(function(c){ return c.id===id; }); }
+function agentById(id){ return state.agents.find(function(a){ return a.id===id; }); }
+function productById(id){ return state.products.find(function(p){ return p.id===id; }); }
+function routeById(id){ return state.routes.find(function(r){ return r.id===id; }); }
+function orderById(id){ return state.orders.find(function(o){ return o.id===id; }); }
+function invoiceByOrderId(id){ return state.invoices.find(function(i){ return i.orderId===id; }); }
+function orderTotal(order){ return order.items.reduce(function(sum,it){ return sum + it.price*it.qty; }, 0); }
+
+// ---------------------------------------------------------------- Route optimization
+function haversineKm(a, b){
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const lat1 = a.lat * Math.PI / 180, lat2 = b.lat * Math.PI / 180;
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function nearestNeighborOrder(start, points){
+  const remaining = points.slice();
+  const order = [];
+  let current = start;
+  while(remaining.length){
+    let bestIdx = 0, bestDist = Infinity;
+    remaining.forEach(function(p, i){
+      const d = haversineKm(current, p);
+      if(d < bestDist){ bestDist = d; bestIdx = i; }
+    });
+    const next = remaining.splice(bestIdx, 1)[0];
+    order.push(next);
+    current = next;
+  }
+  return order;
+}
+
+function showToast(msg){
+  state.toast = msg;
+  render();
+  setTimeout(function(){ state.toast = null; render(); }, 2200);
+}
+
+// ---------------------------------------------------------------- Actions
+const Actions = {
+  nav: function(view){ state.view = view; state.currentRouteId = null; closeModal(false); },
+  openRoute: function(routeId){ state.view = 'routeDetail'; state.currentRouteId = routeId; },
+  openModal: function(type, payload){ state.modal = Object.assign({type:type}, payload||{}); },
+  closeModal: function(){ closeModal(true); },
+  
+  addAgent: function(data){
+    state.agents.push({ id:uid('ag'), name:data.name, phone:data.phone, vehicle:data.vehicle||'—', online:false });
+    closeModal(true); showToast('Agent added: ' + data.name);
+  },
+  toggleAgentOnline: function(agentId){
+    const a = agentById(agentId);
+    if(a){ a.online = !a.online; render(); }
+  },
+  addCustomer: function(data){
+    const lat = 9.01 + (Math.random() - 0.5) * 0.08;
+    const lng = 38.76 + (Math.random() - 0.5) * 0.08;
+    state.customers.push({ id:uid('cu'), name:data.name, phone:data.phone, address:data.address||'', category:data.category||'General', lat:lat, lng:lng });
+    closeModal(true); showToast('Customer registered: ' + data.name);
+  },
+  addProduct: function(data){
+    state.products.push({ id:uid('pr'), name:data.name, unit:data.unit||'pcs', price:Number(data.price)||0 });
+    closeModal(true); showToast('Product added: ' + data.name);
+  },
+  createRoute: function(data){
+    if(!data.customerIds || data.customerIds.length===0){ showToast('Select at least one customer'); return; }
+    const route = {
+      id:uid('rt'), name:data.name, date:new Date(data.date || Date.now()).toISOString(),
+      agentId:data.agentId || null, status:'PLANNED',
+      stops:data.customerIds.map(function(cid, i){
+        return { id:uid('st'), customerId:cid, sequence:i+1, status:'PENDING', visitedAt:null };
+      }),
+    };
+    state.routes.push(route); closeModal(true); showToast('Route created: ' + data.name);
+  },
+  startRoute: function(routeId){
+    const r = routeById(routeId); r.status = 'IN_PROGRESS'; render();
+    showToast('Route started — GPS tracking is now active for ' + (agentById(r.agentId)||{name:'the agent'}).name);
+  },
+  optimizeRoute: function(routeId){
+    const r = routeById(routeId);
+    const pending = r.stops.filter(function(s){ return s.status==='PENDING'; });
+    if(pending.length < 2){ showToast('Not enough remaining stops to optimize'); return; }
+    const runOptimize = function(start){
+      const points = pending.map(function(s){ const c = customerById(s.customerId); return { stopId:s.id, lat:c.lat, lng:c.lng }; });
+      const ordered = nearestNeighborOrder(start, points);
+      const visitedCount = r.stops.filter(function(s){ return s.status==='VISITED'; }).length;
+      ordered.forEach(function(p, i){ const stop = r.stops.find(function(s){ return s.id===p.stopId; }); stop.sequence = visitedCount + i + 1; });
+      r.stops.sort(function(a,b){ return a.sequence - b.sequence; });
+      render(); showToast('Route re-ordered for the shortest remaining trip');
+    };
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(
+        function(pos){ runOptimize({ lat:pos.coords.latitude, lng:pos.coords.longitude }); },
+        function(){ runOptimize({ lat:9.02, lng:38.75 }); },
+        { timeout:3000 }
+      );
+    } else { runOptimize({ lat:9.02, lng:38.75 }); }
+  },
+  completeRoute: function(routeId){
+    const r = routeById(routeId);
+    const remaining = r.stops.filter(function(s){ return s.status==='PENDING'; }).length;
+    if(remaining>0 && !confirm(remaining + ' stop(s) have not been visited yet. Complete the route anyway?')) return;
+    r.status = 'COMPLETED'; state.view = 'routes'; state.currentRouteId = null; render(); showToast('Route completed');
+  },
+  visitStop: function(routeId, stopId){
+    const route = routeById(routeId); const stop = route.stops.find(function(s){ return s.id===stopId; });
+    Actions.openModal('orderWizard', { routeId:routeId, stopId:stopId, customerId:stop.customerId, agentId:route.agentId, cart:{}, stage:'order' });
+  },
+  quickOrder: function(customerId){
+    Actions.openModal('orderWizard', { routeId:null, stopId:null, customerId:customerId, agentId:state.agents[0] ? state.agents[0].id : null, cart:{}, stage:'order' });
+  },
+  cartChange: function(productId, delta){
+    const m = state.modal; if(!m) return;
+    m.cart[productId] = Math.max(0, (m.cart[productId]||0) + delta); render();
+  },
+  cartSetQty: function(productId, rawValue){
+    const m = state.modal; if(!m) return;
+    m.cart[productId] = Math.max(0, Math.floor(Number(rawValue)) || 0); render();
+  },
+  startCustomProduct: function(){
+    const m = state.modal; if(!m) return;
+    m.addingCustomProduct = true; m.customProductName = ''; m.customProductPrice = ''; m.customProductQty = 1; render();
+  },
+  cancelCustomProduct: function(){
+    const m = state.modal; if(!m) return; m.addingCustomProduct = false; render();
+  },
+  confirmCustomProduct: function(){
+    const m = state.modal; if(!m) return;
+    const name = (m.customProductName||'').trim(); const price = Number(m.customProductPrice); const qty = Math.max(1, Math.floor(Number(m.customProductQty)) || 1);
+    if(!name){ showToast('Enter a product name'); return; } if(!(price >= 0)){ showToast('Enter a valid price'); return; }
+    const product = { id:uid('pr'), name:name, unit:'pcs', price:price };
+    state.products.push(product); m.cart[product.id] = qty; m.addingCustomProduct = false; render();
+    showToast('Added "' + name + '" to the order and to your catalog');
+  },
+  submitOrder: function(){
+    const m = state.modal;
+    const items = Object.keys(m.cart).filter(function(pid){ return m.cart[pid] > 0; }).map(function(pid){
+      const p = productById(pid); return { productId:pid, qty:m.cart[pid], price:p.price };
+    });
+    if(items.length===0){ showToast('Add at least one product'); return; }
+    const order = { id:uid('or'), customerId:m.customerId, agentId:m.agentId, routeId:m.routeId, items:items, status:'SUBMITTED', createdAt:new Date().toISOString() };
+    state.orders.push(order); state.deliveries[order.id] = { status:'PENDING', startedAt:null, arrivedAt:null, confirmedAt:null };
+    if(m.routeId && m.stopId){
+      const route = routeById(m.routeId); const stop = route.stops.find(function(s){ return s.id===m.stopId; });
+      stop.status = 'VISITED'; stop.visitedAt = new Date().toISOString();
+    }
+    m.orderId = order.id; m.stage = 'delivery'; render(); showToast('Order submitted');
+  },
+  startDelivery: function(orderId){ state.deliveries[orderId].status = 'IN_TRANSIT'; state.deliveries[orderId].startedAt = new Date().toISOString(); render(); },
+  arriveDelivery: function(orderId){ state.deliveries[orderId].status = 'ARRIVED'; state.deliveries[orderId].arrivedAt = new Date().toISOString(); render(); },
+  confirmDelivery: function(orderId){
+    const d = state.deliveries[orderId]; d.status = 'DELIVERED'; d.confirmedAt = new Date().toISOString();
+    const order = orderById(orderId); order.status = 'CONFIRMED';
+    let invoice = invoiceByOrderId(orderId);
+    if(!invoice){
+      invoice = { id:uid('inv'), orderId:orderId, customerId:order.customerId, total:orderTotal(order), paymentStatus:'UNPAID', createdAt:new Date().toISOString() };
+      state.invoices.push(invoice);
+    }
+    if(state.modal && state.modal.type==='orderWizard'){ state.modal.stage = 'invoice'; state.modal.invoiceId = invoice.id; }
+    render(); showToast('Delivery confirmed — invoice generated');
+  },
+  resumeOrder: function(orderId){
+    const order = orderById(orderId); const delivery = state.deliveries[orderId]; const invoice = invoiceByOrderId(orderId);
+    let stage = 'delivery'; if(delivery.status==='DELIVERED') stage = 'invoice';
+    Actions.openModal('orderWizard', { routeId:order.routeId, stopId:null, customerId:order.customerId, agentId:order.agentId, cart:{}, stage:stage, orderId:orderId, invoiceId: invoice ? invoice.id : null });
+  },
+  setPaymentStatus: function(invoiceId, status){
+    const inv = state.invoices.find(function(i){ return i.id===invoiceId; });
+    if(inv){ inv.paymentStatus = status; render(); showToast('Payment status updated: ' + status); }
+  },
+  payWithTelebirr: function(invoiceId){
+    const m = state.modal; if(!m) return;
+    m.stage = 'telebirr'; m.telebirrInvoiceId = invoiceId; m.telebirrPhone = ''; m.telebirrProcessing = false; render();
+  },
+  payWithTelebirrStandalone: function(invoiceId){
+    Actions.openModal('orderWizard', { stage:'telebirr', telebirrInvoiceId:invoiceId, telebirrPhone:'', telebirrProcessing:false, standalone:true }); render();
+  },
+  cancelTelebirr: function(){
+    const m = state.modal; if(!m) return;
+    if(m.standalone){ closeModal(true); return; } m.stage = 'invoice'; render();
+  },
+  confirmTelebirr: function(){
+    const m = state.modal; if(!m) return;
+    if(!(m.telebirrPhone||'').trim()){ showToast('Enter your telebirr phone number'); return; }
+    m.telebirrProcessing = true; render();
+    setTimeout(function(){
+      const inv = state.invoices.find(function(i){ return i.id===m.telebirrInvoiceId; });
+      if(inv) inv.paymentStatus = 'PAID';
+      showToast('Payment confirmed via telebirr ✓');
+      if(m.standalone){ closeModal(true); return; }
+      m.stage = 'invoice'; m.telebirrProcessing = false; render();
+    }, 1400);
+  },
+  saveWorkspace: function(data){
+    state.workspace.name = data.name; state.workspace.currency = data.currency;
+    showToast('Workspace updated'); render();
+  },
+};
+
+function closeModal(shouldRender){ state.modal = null; if(shouldRender) render(); }
+
+// ---------------------------------------------------------------- Badges
+function statusBadge(status){
+  const map = {
+    PLANNED:['gray','Not started'], IN_PROGRESS:['amber','In progress'], COMPLETED:['green','Completed'],
+    PENDING:['gray','Pending'], IN_TRANSIT:['amber','In transit'], ARRIVED:['amber','Arrived'], DELIVERED:['green','Delivered'],
+    SUBMITTED:['amber','Submitted'], CONFIRMED:['green','Confirmed'],
+    UNPAID:['red','Unpaid'], PARTIAL:['amber','Partial'], PAID:['green','Paid'],
+  };
+  const m = map[status] || ['gray', status];
+  return '<span class="badge ' + m[0] + '">' + m[1] + '</span>';
+}
+
+// ---------------------------------------------------------------- Top Navigation
+function renderTopnav(){
+  return (
+    '<div class="topnav">' +
+      '<div class="nav-left">' +
+        '<div class="brand" data-action="nav" data-view="dashboard">' +
+          '<div class="brand-mark">S</div>' +
+          '<div class="brand-name">Simuni</div>' +
+          '<div class="badge-gold">ETHIOPIA B2B DISPATCH</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="nav-center">' +
+        '<div class="tenant-dropdown">' + esc(state.workspace.name) + ' ▾</div>' +
+        '<button class="nav-item ' + (state.view==='dashboard'?'active':'') + '" data-action="nav" data-view="dashboard">Live Dispatch & Telemetry</button>' +
+        '<button class="nav-item ' + (['orders','invoices'].includes(state.view)?'active':'') + '" data-action="nav" data-view="orders">Orders & E-Invoicing</button>' +
+        '<button class="nav-item ' + (['routes','agents','routeDetail'].includes(state.view)?'active':'') + '" data-action="nav" data-view="routes">Field Routes & Agents</button>' +
+        '<button class="nav-item" onclick="alert(\'Telegram integration placeholder\')">Telegram Channel Orders</button>' +
+        '<button class="nav-item ' + (['customers','products'].includes(state.view)?'active':'') + '" data-action="nav" data-view="customers">Customers & Catalog</button>' +
+      '</div>' +
+      '<div class="nav-right">' +
+        '<div class="telebirr-pill"><div class="telebirr-dot"></div>telebirr Active (' + esc(state.workspace.currency) + ')</div>' +
+        '<button class="btn gold small" data-action="open-modal" data-modal="newRoute">+ New Route / Dispatch</button>' +
+        '<div class="avatar-circle" data-action="nav" data-view="workspace">JS</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// ---------------------------------------------------------------- Dashboard
+function renderDashboard(){
+  const activeAgents = state.agents.filter(function(a){ return a.online; }).length;
+  const ordersToday = state.orders.filter(function(o){ return isToday(o.createdAt); }).length;
+  const deliveredToday = Object.keys(state.deliveries).filter(function(oid){
+    const d = state.deliveries[oid]; return d.status==='DELIVERED' && d.confirmedAt && isToday(d.confirmedAt);
+  }).length;
+  
+  const inflow = state.invoices.filter(function(i){ return i.paymentStatus==='PAID'; }).reduce(function(sum,i){ return sum + i.total; }, 0) || 45200;
+  
+  const recentOrders = state.orders.slice(-5).reverse();
+
+  return (
+    '<div class="breadcrumb">LIVE TELEMETRY · FLEET STREAM · ' + esc(state.workspace.name).toUpperCase() + '</div>' +
+    '<div class="page-header">' +
+      '<div><h1 class="page-title display">Manager Command & Dispatch Hub</h1>' +
+      '<div class="status-row">' +
+        '<div class="status-badge"><div class="status-dot green"></div>WebSocket: 14ms</div>' +
+        '<div class="status-badge"><div class="status-dot green"></div>Postgres Pool: 8/10</div>' +
+        '<button class="btn secondary small">Force Resync</button>' +
+      '</div></div>' +
+    '</div>' +
+    
+    '<div class="stat-grid">' +
+      '<div class="stat-card">' +
+        '<div class="stat-label">TODAY\'S FIELD INFLOW</div>' +
+        '<div class="stat-value mono">' + money(inflow) + '</div>' +
+        '<div class="stat-sub"><span class="stat-trend">↑ 12%</span><span>telebirr + cash</span></div>' +
+      '</div>' +
+      '<div class="stat-card">' +
+        '<div class="stat-label">ACTIVE FIELD AGENTS</div>' +
+        '<div class="stat-value mono">' + activeAgents + ' / ' + state.agents.length + '</div>' +
+        '<div class="stat-sub"><span>Live GPS: ' + activeAgents + '</span><span>Offline: ' + (state.agents.length - activeAgents) + '</span></div>' +
+      '</div>' +
+      '<div class="stat-card">' +
+        '<div class="stat-label">DELIVERED DROPS / STOPS</div>' +
+        '<div class="stat-value mono">' + deliveredToday + ' / ' + (deliveredToday+4) + ' <span class="badge green">98% SLA</span></div>' +
+        '<div class="stat-sub"><span>Addis Ababa Region</span></div>' +
+      '</div>' +
+      '<div class="stat-card">' +
+        '<div class="stat-label">TELEGRAM INBOUND ORDERS</div>' +
+        '<div class="stat-value mono">24</div>' +
+        '<div class="stat-sub"><span>18 Dispatched</span><span>6 Pending</span></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="two-col-layout">' +
+      '<div class="panel">' +
+        '<div class="panel-header">Live Regional Dispatch Map</div>' +
+        '<div class="sector-tabs">' +
+          '<button class="pill-tab active">All Sectors</button>' +
+          '<button class="pill-tab">Bole</button>' +
+          '<button class="pill-tab">Merkato</button>' +
+          '<button class="pill-tab">Piassa</button>' +
+        '</div>' +
+        '<div class="map-placeholder">' +
+          '<div><div style="font-size:24px; margin-bottom:8px;">🗺️</div>Live Map View Enabled<br/>OSRM Routing Engine Connected</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="panel">' +
+        '<div class="panel-header">Active Route Manifests</div>' +
+        '<div style="padding:16px; display:flex; flex-direction:column; gap:12px;">' +
+          (state.routes.length ? state.routes.map(function(r){
+            const agent = agentById(r.agentId);
+            const visited = r.stops.filter(function(s){ return s.status==='VISITED'; }).length;
+            const pct = r.stops.length ? Math.round(visited/r.stops.length*100) : 0;
+            return '<div class="route-card" data-action="open-route" data-id="' + r.id + '">' +
+              '<div class="route-card-top"><div><div class="route-name">' + esc(r.name) + '</div><div class="route-meta">' + (agent?esc(agent.name):'Unassigned') + '</div></div>' + statusBadge(r.status) + '</div>' +
+              '<div class="route-meta">' + visited + ' of ' + r.stops.length + ' stops completed</div>' +
+              '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+              '<div class="route-actions">' +
+                '<button class="btn secondary small">View Turn-by-Turn</button>' +
+                '<button class="btn secondary small">Invoice PDF</button>' +
+              '</div>' +
+            '</div>';
+          }).join('') : '<div class="empty-state">No active routes.</div>') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    
+    '<div class="panel" style="margin-bottom: 24px;">' +
+      '<div class="panel-header">Inbound Orders via @SimuniBot</div>' +
+      '<table><thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Amount</th><th>Time</th><th>Action</th></tr></thead><tbody>' +
+      '<tr><td class="mono">#TG-8821</td><td>Alem Grocery</td><td>4 items</td><td class="mono">ETB 1,840.00</td><td>10 mins ago</td><td><button class="btn small gold">Assign Route</button></td></tr>' +
+      '<tr><td class="mono">#TG-8820</td><td>Ethio Cafe</td><td>2 items</td><td class="mono">ETB 960.00</td><td>45 mins ago</td><td><button class="btn small secondary">Assigned</button></td></tr>' +
+      '</tbody></table>' +
+    '</div>' +
+    
+    '<div class="system-footer">' +
+      '<div class="health-row">' +
+        '<div class="health-item"><div class="status-dot green"></div>Better Auth Guard</div>' +
+        '<div class="health-item"><div class="status-dot green"></div>MinIO Storage</div>' +
+        '<div class="health-item"><div class="status-dot green"></div>telebirr Fabric Gateway</div>' +
+        '<div class="health-item"><div class="status-dot green"></div>OSRM Driving Engine</div>' +
+      '</div>' +
+      '<div>Simuni v2.6 · Better Auth Multi-tenant Active · NODE-ADD-01</div>' +
+    '</div>'
+  );
+}
+
+// ---------------------------------------------------------------- Routes & Agents View
+function renderRoutes(){
+  return (
+    '<div class="breadcrumb">FIELD OPERATIONS · MANIFESTS</div>' +
+    '<div class="page-header">' +
+      '<div><h1 class="page-title display">Field Routes & OSRM Engine</h1><p class="page-sub">Plan, assign, and track delivery routes</p></div>' +
+      '<button class="btn gold" data-action="open-modal" data-modal="newRoute">+ New Route</button>' +
+    '</div>' +
+    (state.routes.length ? '<div class="route-grid" style="padding:0; margin-bottom: 32px;">' + state.routes.map(function(r){
+      const visited = r.stops.filter(function(s){ return s.status==='VISITED'; }).length;
+      const pct = r.stops.length ? Math.round(visited/r.stops.length*100) : 0;
+      const agent = agentById(r.agentId);
+      return '<div class="route-card" data-action="open-route" data-id="' + r.id + '">' +
+        '<div class="route-card-top"><div><div class="route-name">' + esc(r.name) + '</div>' +
+        '<div class="route-meta">' + fmtDate(r.date) + ' · ' + (agent?esc(agent.name):'Unassigned') + '</div></div>' +
+        statusBadge(r.status) + '</div>' +
+        '<div class="route-meta">' + visited + ' / ' + r.stops.length + ' stops visited</div>' +
+        '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+      '</div>';
+    }).join('') + '</div>' : '<div class="panel" style="margin-bottom:32px;"><div class="empty-state">No routes yet. Create one to assign an agent and start tracking.</div></div>') +
+    
+    '<div class="page-header">' +
+      '<div><h2 class="page-title display" style="font-size:20px;">Field Agent Fleet Management</h2></div>' +
+      '<button class="btn secondary" data-action="open-modal" data-modal="addAgent">+ Add Agent</button>' +
+    '</div>' +
+    '<div class="panel"><table><thead><tr><th>Agent & Auth ID</th><th>Assigned Route</th><th>Vehicle / Fleet</th><th>Revenue Collected</th><th>Sync & Telemetry</th><th>Quick Action</th></tr></thead><tbody>' +
+    (state.agents.length ? state.agents.map(function(a){
+      const activeRoute = state.routes.find(function(r){ return r.agentId===a.id && r.status==='IN_PROGRESS'; });
+      return '<tr><td><strong>' + esc(a.name) + '</strong><br/><span style="font-size:11px;color:var(--text-muted);" class="mono">USR-' + a.id + '</span></td>' +
+        '<td>' + (activeRoute ? '<span class="badge gold">' + esc(activeRoute.name) + '</span>' : '<span style="color:var(--text-muted)">—</span>') + '</td>' +
+        '<td>' + esc(a.vehicle) + '</td>' +
+        '<td class="mono">' + money(4500) + '</td>' +
+        '<td><span class="avatar-dot ' + (a.online?'on':'off') + '"></span>' + (a.online?'Live Sync':'Offline') + '</td>' +
+        '<td><button class="btn secondary small" data-action="toggle-agent" data-id="' + a.id + '">' + (a.online?'Set Offline':'Set Online') + '</button></td></tr>';
+    }).join('') : '<tr><td colspan="6"><div class="empty-state">No agents yet.</div></td></tr>') +
+    '</tbody></table></div>'
+  );
+}
+
+function renderRouteDetail(){
+  const r = routeById(state.currentRouteId);
+  if(!r) { state.view='routes'; return renderRoutes(); }
+  const agent = agentById(r.agentId);
+  const visited = r.stops.filter(function(s){ return s.status==='VISITED'; }).length;
+
+  return (
+    '<button class="link-btn" data-action="nav" data-view="routes" style="margin-bottom:14px;">&larr; Back to Routes</button>' +
+    '<div class="page-header">' +
+      '<div><h1 class="page-title display">' + esc(r.name) + '</h1>' +
+      '<p class="page-sub">' + fmtDate(r.date) + ' · Agent: ' + (agent?esc(agent.name):'Unassigned') + ' · ' + visited + '/' + r.stops.length + ' stops visited</p></div>' +
+      '<div>' +
+        (r.status==='IN_PROGRESS' && r.stops.filter(function(s){ return s.status==='PENDING'; }).length > 1
+          ? '<button class="btn secondary" data-action="optimize-route" data-id="' + r.id + '" style="margin-right:8px;">📍 Suggest Best Route</button>' : '') +
+        (r.status==='PLANNED' ? '<button class="btn gold" data-action="start-route" data-id="' + r.id + '">Start Route</button>' : '') +
+        (r.status==='IN_PROGRESS' ? '<button class="btn" data-action="complete-route" data-id="' + r.id + '">Complete Route</button>' : '') +
+        (r.status==='COMPLETED' ? statusBadge('COMPLETED') : '') +
+      '</div>' +
+    '</div>' +
+    
+    '<div class="three-col-layout">' +
+      '<div class="panel">' +
+        '<div class="panel-header">Planned Waypoint Manifest</div>' +
+        '<div class="waypoint-manifest">' +
+        r.stops.map(function(s){
+          const c = customerById(s.customerId); const done = s.status==='VISITED';
+          return '<div class="stop-row">' +
+            '<div class="stop-drag">⋮⋮</div>' +
+            '<div class="stop-num ' + (done?'done':'') + '">' + (done ? '✓' : s.sequence) + '</div>' +
+            '<div style="flex:1;"><div class="stop-name">' + esc(c.name) + '</div><div class="stop-address">' + esc(c.address) + '</div></div>' +
+            (done ? '<span class="badge green">Visited ' + fmtTime(s.visitedAt) + '</span>'
+                  : '<button class="btn small" ' + (r.status==='IN_PROGRESS' ? '' : 'disabled title="Start the route first"') + ' data-action="visit-stop" data-route-id="' + r.id + '" data-stop-id="' + s.id + '">Collect Order</button>') +
+          '</div>';
+        }).join('') +
+        '</div>' +
+      '</div>' +
+      
+      '<div style="display:flex; flex-direction:column; gap:24px;">' +
+        '<div class="panel">' +
+          '<div class="panel-header">OSRM Navigation Vector</div>' +
+          '<div class="map-placeholder" style="height:200px;"><div>📍 Vector Map Active</div></div>' +
+        '</div>' +
+        
+        '<div class="panel">' +
+          '<div class="panel-header">Mobile Sync & Edge Diagnostics</div>' +
+          '<div class="diag-grid">' +
+            '<div class="diag-item"><div class="diag-label">Socket.IO Ping</div><div class="diag-val mono" style="color:var(--success)">14ms</div></div>' +
+            '<div class="diag-item"><div class="diag-label">SQLite Buffer</div><div class="diag-val mono">0 pending</div></div>' +
+            '<div class="diag-item"><div class="diag-label">Device Battery</div><div class="diag-val mono">82%</div></div>' +
+            '<div class="diag-item"><div class="diag-label">Carrier Signal</div><div class="diag-val mono">4G LTE</div></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// ---------------------------------------------------------------- Customers & Products
+function renderCustomers(){
+  return (
+    '<div class="breadcrumb">DATA & CATALOG · CUSTOMERS</div>' +
+    '<div class="page-header">' +
+      '<div><h1 class="page-title display">Customers & Catalog</h1><p class="page-sub">Manage your CRM and product inventory</p></div>' +
+      '<div><button class="btn secondary" data-action="nav" data-view="products" style="margin-right:8px;">Manage Products</button>' +
+      '<button class="btn gold" data-action="open-modal" data-modal="addCustomer">+ Register Customer</button></div>' +
+    '</div>' +
+    '<div class="panel"><table><thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Category</th><th></th></tr></thead><tbody>' +
+    (state.customers.length ? state.customers.map(function(c){
+      return '<tr><td><strong>' + esc(c.name) + '</strong></td><td class="mono">' + esc(c.phone) + '</td><td>' + esc(c.address) + '</td>' +
+        '<td><span class="badge gray">' + esc(c.category) + '</span></td>' +
+        '<td style="white-space:nowrap; text-align:right;"><button class="btn secondary small" data-action="quick-order" data-id="' + c.id + '">Collect Order</button></td></tr>';
+    }).join('') : '<tr><td colspan="5"><div class="empty-state">No customers registered yet.</div></td></tr>') +
+    '</tbody></table></div>'
+  );
+}
+
+function renderProducts(){
+  return (
+    '<div class="breadcrumb">DATA & CATALOG · PRODUCTS</div>' +
+    '<div class="page-header">' +
+      '<div><h1 class="page-title display">Products</h1><p class="page-sub">Catalog and pricing (' + esc(state.workspace.currency) + ')</p></div>' +
+      '<div><button class="btn secondary" data-action="nav" data-view="customers" style="margin-right:8px;">Back to Customers</button>' +
+      '<button class="btn gold" data-action="open-modal" data-modal="addProduct">+ Add Product</button></div>' +
+    '</div>' +
+    '<div class="panel"><table><thead><tr><th>Name</th><th>Unit</th><th>Price</th></tr></thead><tbody>' +
+    (state.products.length ? state.products.map(function(p){
+      return '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + esc(p.unit) + '</td><td class="mono">' + money(p.price) + '</td></tr>';
+    }).join('') : '<tr><td colspan="3"><div class="empty-state">No products yet.</div></td></tr>') +
+    '</tbody></table></div>'
+  );
+}
+
+// ---------------------------------------------------------------- Orders & Deliveries
+function renderOrders(){
+  const rows = state.orders.slice().reverse();
+  return (
+    '<div class="breadcrumb">TRANSACTIONS · ORDERS & E-INVOICING</div>' +
+    '<div class="page-header">' +
+      '<div><h1 class="page-title display">Orders & E-Invoicing</h1><p class="page-sub">Every order collected in the field, end to end</p></div>' +
+      '<button class="btn secondary" data-action="nav" data-view="invoices">View All Invoices</button>' +
+    '</div>' +
+    '<div class="panel"><table><thead><tr><th>Customer</th><th>Route</th><th>Total</th><th>Order</th><th>Delivery</th><th></th></tr></thead><tbody>' +
+    (rows.length ? rows.map(function(o){
+      const d = state.deliveries[o.id];
+      const route = o.routeId ? routeById(o.routeId) : null;
+      const invoice = invoiceByOrderId(o.id);
+      let actionLabel = 'Continue';
+      if(d.status==='DELIVERED') actionLabel = invoice ? 'View Invoice' : 'Continue';
+      return '<tr><td><strong>' + esc(customerById(o.customerId).name) + '</strong></td>' +
+        '<td>' + (route ? '<span class="badge gold">'+esc(route.name)+'</span>' : '<span style="color:var(--text-muted)">Walk-in</span>') + '</td>' +
+        '<td class="mono">' + money(orderTotal(o)) + '</td>' +
+        '<td>' + statusBadge(o.status) + '</td>' +
+        '<td>' + statusBadge(d.status) + '</td>' +
+        '<td style="text-align:right;"><button class="btn secondary small" data-action="resume-order" data-id="' + o.id + '">' + actionLabel + '</button></td></tr>';
+    }).join('') : '<tr><td colspan="6"><div class="empty-state">No orders collected yet.</div></td></tr>') +
+    '</tbody></table></div>'
+  );
+}
+
+function renderInvoices(){
+  const rows = state.invoices.slice().reverse();
+  return (
+    '<div class="breadcrumb">TRANSACTIONS · INVOICES</div>' +
+    '<div class="page-header">' +
+      '<div><h1 class="page-title display">E-Invoices</h1><p class="page-sub">Generated automatically when a delivery is confirmed</p></div>' +
+      '<button class="btn secondary" data-action="nav" data-view="orders">Back to Orders</button>' +
+    '</div>' +
+    '<div class="panel"><table><thead><tr><th>Customer</th><th>Date</th><th>Total</th><th>Payment Status</th><th></th></tr></thead><tbody>' +
+    (rows.length ? rows.map(function(i){
+      return '<tr><td><strong>' + esc(customerById(i.customerId).name) + '</strong></td>' +
+        '<td>' + fmtDate(i.createdAt) + '</td><td class="mono">' + money(i.total) + '</td>' +
+        '<td><select data-action="payment-status" data-id="' + i.id + '" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-weight:600;outline:none;">' +
+          ['UNPAID','PARTIAL','PAID'].map(function(s){ return '<option value="'+s+'" '+(i.paymentStatus===s?'selected':'')+'>'+s+'</option>'; }).join('') +
+        '</select></td>' +
+        '<td style="text-align:right;">' + (i.paymentStatus !== 'PAID' ? '<button class="btn telebirr-btn small" data-action="pay-telebirr-standalone" data-id="' + i.id + '">📱 Pay with telebirr</button>' : '') + '</td></tr>';
+    }).join('') : '<tr><td colspan="5"><div class="empty-state">No invoices generated yet.</div></td></tr>') +
+    '</tbody></table></div>'
+  );
+}
+
+// ---------------------------------------------------------------- Workspace
+function renderWorkspace(){
+  return (
+    '<div class="breadcrumb">SYSTEM · SETTINGS</div>' +
+    '<div class="page-header"><div><h1 class="page-title display">Workspace Settings</h1><p class="page-sub">Business profile for this Simuni workspace</p></div></div>' +
+    '<div class="panel" style="padding:32px;max-width:480px;">' +
+    '<form data-form="workspace">' +
+      '<div class="field"><label>Enterprise Hub Name</label><input name="name" value="' + esc(state.workspace.name) + '" required /></div>' +
+      '<div class="field"><label>Currency</label><input name="currency" value="' + esc(state.workspace.currency) + '" required /></div>' +
+      '<button class="btn gold" type="submit" style="margin-top:12px;">Save Changes</button>' +
+    '</form></div>'
+  );
+}
+
+// ---------------------------------------------------------------- Modals
+function renderModal(){
+  if(!state.modal) return '';
+  const m = state.modal;
+  let inner = '';
+
+  if(m.type==='addAgent'){
+    inner = modalShell('Add Agent', 'A new field agent for your team', '' +
+      '<form data-form="addAgent">' +
+        field('Full name','name','text',true) +
+        field('Phone number','phone','tel',true) +
+        field('Vehicle','vehicle','text',false,'e.g. Motorbike - AA-12345') +
+        '<button class="btn gold" type="submit" style="width:100%;margin-top:12px;">Add Agent</button>' +
+      '</form>');
+  }
+  else if(m.type==='addCustomer'){
+    inner = modalShell('Register Customer', 'Add a new customer to this workspace', '' +
+      '<form data-form="addCustomer">' +
+        field('Business name','name','text',true) +
+        field('Phone number','phone','tel',true) +
+        field('Address','address','text',false) +
+        field('Category','category','text',false,'e.g. Retail, HORECA') +
+        '<button class="btn gold" type="submit" style="width:100%;margin-top:12px;">Register Customer</button>' +
+      '</form>');
+  }
+  else if(m.type==='addProduct'){
+    inner = modalShell('Add Product', 'Add an item to your product catalog', '' +
+      '<form data-form="addProduct">' +
+        field('Product name','name','text',true) +
+        '<div class="two-col">' + field('Unit','unit','text',false,'e.g. crate') + field('Price ('+esc(state.workspace.currency)+')','price','number',true) + '</div>' +
+        '<button class="btn gold" type="submit" style="width:100%;margin-top:12px;">Add Product</button>' +
+      '</form>');
+  }
+  else if(m.type==='newRoute'){
+    inner = modalShell('New Route', 'Pick customers to visit and (optionally) assign an agent', '' +
+      '<form data-form="newRoute">' +
+        field('Route name','name','text',true,'e.g. Bole Morning Run') +
+        field('Date','date','date',true) +
+        '<div class="field"><label>Assign agent</label><select name="agentId">' +
+          '<option value="">— Unassigned —</option>' +
+          state.agents.map(function(a){ return '<option value="'+a.id+'">'+esc(a.name)+'</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="field"><label>Customers on this route</label><div class="checkbox-list">' +
+          (state.customers.length ? state.customers.map(function(c){
+            return '<label class="checkbox-row"><input type="checkbox" name="customerIds" value="' + c.id + '" /> ' + esc(c.name) + '</label>';
+          }).join('') : '<div class="muted-note">No customers registered yet.</div>') +
+        '</div></div>' +
+        '<button class="btn gold" type="submit" style="width:100%;margin-top:12px;">Create Route</button>' +
+      '</form>');
+  }
+  else if(m.type==='orderWizard'){ inner = renderOrderWizard(m); }
+
+  return '<div class="modal-backdrop" data-action="backdrop">' + inner + '</div>';
+}
+
+function modalShell(title, sub, body, wide){
+  return '<div class="modal ' + (wide?'wide':'') + '" data-stop-propagation="1">' +
+    '<button class="modal-close" data-action="close-modal">&times;</button>' +
+    '<h2 class="display">' + esc(title) + '</h2><p class="modal-sub">' + esc(sub) + '</p>' + body + '</div>';
+}
+function field(label, name, type, required, placeholder){
+  return '<div class="field"><label>' + esc(label) + '</label><input name="' + name + '" type="' + type + '" ' + (required?'required':'') + ' placeholder="' + esc(placeholder||'') + '" /></div>';
+}
+
+function renderOrderWizard(m){
+  const customer = customerById(m.customerId);
+
+  if(m.stage==='order'){
+    const total = state.products.reduce(function(sum,p){ return sum + (m.cart[p.id]||0)*p.price; }, 0);
+    return modalShell('Collect Order — ' + customer.name, 'Add products and quantities', '' +
+      '<div>' + state.products.map(function(p){
+        const qty = m.cart[p.id] || 0;
+        return '<div class="cart-row"><div><div class="cart-name">' + esc(p.name) + '</div><div class="cart-price mono">' + money(p.price) + ' / ' + esc(p.unit) + '</div></div>' +
+          '<div class="stepper">' +
+            '<button data-action="cart-dec" data-id="' + p.id + '">−</button>' +
+            '<input class="qty-input" type="number" min="0" inputmode="numeric" value="' + qty + '" data-action="cart-input" data-id="' + p.id + '" />' +
+            '<button data-action="cart-inc" data-id="' + p.id + '">+</button>' +
+          '</div></div>';
+      }).join('') + '</div>' +
+      (m.addingCustomProduct
+        ? '<div class="custom-product-form">' +
+            '<div class="field"><label>Product name</label><input id="customProductName" type="text" placeholder="e.g. Habesha Beer 330ml" value="' + esc(m.customProductName||'') + '" data-action="custom-name-input" /></div>' +
+            '<div class="two-col">' +
+              '<div class="field"><label>Unit price (' + esc(state.workspace.currency) + ')</label><input id="customProductPrice" type="number" min="0" step="0.01" placeholder="0.00" value="' + (m.customProductPrice||'') + '" data-action="custom-price-input" /></div>' +
+              '<div class="field"><label>Quantity</label><input id="customProductQty" type="number" min="1" value="' + (m.customProductQty||1) + '" data-action="custom-qty-input" /></div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;">' +
+              '<button class="btn small" data-action="confirm-custom-product" style="flex:1;">Add to Order</button>' +
+              '<button class="btn secondary small" data-action="cancel-custom-product" style="flex:1;">Cancel</button>' +
+            '</div>' +
+          '</div>'
+        : '<button class="link-btn" data-action="start-custom-product" style="margin-top:16px;">+ Add custom product</button>'
+      ) +
+      '<div class="cart-total-row"><span>Total</span><span class="mono">' + money(total) + '</span></div>' +
+      '<button class="btn gold" data-action="submit-order" style="width:100%;margin-top:24px;">Submit Order</button>'
+    , true);
+  }
+
+  if(m.stage==='delivery'){
+    const orderId = m.orderId; const d = state.deliveries[orderId]; const order = orderById(orderId);
+    let nextAction = '';
+    if(d.status==='PENDING') nextAction = '<button class="btn gold" data-action="delivery-start" data-id="' + orderId + '" style="width:100%;">Start Delivery</button>';
+    else if(d.status==='IN_TRANSIT') nextAction = '<button class="btn gold" data-action="delivery-arrive" data-id="' + orderId + '" style="width:100%;">Arrived at Customer</button>';
+    else if(d.status==='ARRIVED') nextAction = '<button class="btn gold" data-action="delivery-confirm" data-id="' + orderId + '" style="width:100%;">Confirm Delivery</button>';
+    const timeline = ['Start delivery','Navigate','Arrive customer','Confirm delivery'];
+    const stageIndex = {PENDING:0, IN_TRANSIT:1, ARRIVED:2, DELIVERED:4}[d.status];
+
+    return modalShell('Delivery — ' + customer.name, 'Order total: ' + money(orderTotal(order)), '' +
+      timeline.map(function(label, i){
+        const done = i < stageIndex + 1;
+        return '<div class="timeline-step ' + (done?'done':'') + '"><div class="timeline-dot ' + (done?'done':'') + '"></div>' +
+          '<div class="timeline-label ' + (done?'done':'') + '">' + label + '</div></div>';
+      }).join('') +
+      '<div style="margin-top:24px;">' + nextAction + '</div>'
+    );
+  }
+
+  if(m.stage==='invoice'){
+    const invoice = state.invoices.find(function(i){ return i.id===m.invoiceId; }) || invoiceByOrderId(m.orderId);
+    const order = orderById(invoice.orderId);
+    return modalShell('Invoice Generated', customer.name + ' · ' + fmtDate(invoice.createdAt), '' +
+      '<div class="invoice-card">' +
+        order.items.map(function(it){
+          const p = productById(it.productId);
+          return '<div class="invoice-line"><span>' + esc(p.name) + ' × ' + it.qty + '</span><span class="mono">' + money(it.price*it.qty) + '</span></div>';
+        }).join('') +
+        '<div class="invoice-total"><span>Total</span><span class="mono">' + money(invoice.total) + '</span></div>' +
+      '</div>' +
+      '<div class="field" style="margin-top:24px;"><label>Payment status</label>' +
+        '<select data-action="payment-status" data-id="' + invoice.id + '">' +
+          ['UNPAID','PARTIAL','PAID'].map(function(s){ return '<option value="'+s+'" '+(invoice.paymentStatus===s?'selected':'')+'>'+s+'</option>'; }).join('') +
+        '</select></div>' +
+      (invoice.paymentStatus !== 'PAID'
+        ? '<button class="btn telebirr-btn" data-action="pay-telebirr" data-id="' + invoice.id + '" style="width:100%;margin-top:12px;">📱 Pay with telebirr</button>' : '') +
+      '<button class="btn secondary" data-action="close-modal" style="width:100%;margin-top:12px;">Done</button>'
+    );
+  }
+
+  if(m.stage==='telebirr'){
+    const invoice = state.invoices.find(function(i){ return i.id===m.telebirrInvoiceId; });
+    return modalShell('telebirr', 'Simulated payment — no real money moves', '' +
+      '<div class="telebirr-sheet">' +
+        '<div class="telebirr-logo">telebirr</div>' +
+        '<div class="telebirr-amount">' + money(invoice.total) + '</div>' +
+        '<div class="telebirr-to">to ' + esc(state.workspace.name) + '</div>' +
+        (m.telebirrProcessing
+          ? '<div class="telebirr-processing">Processing payment…</div>'
+          : '<div class="field"><label style="text-align:left;">telebirr phone number</label>' +
+              '<input type="tel" placeholder="09XXXXXXXX" value="' + esc(m.telebirrPhone||'') + '" data-action="telebirr-phone-input" /></div>' +
+            '<div class="field"><label style="text-align:left;">PIN</label>' +
+              '<input type="password" placeholder="••••" maxlength="4" data-action="telebirr-pin-input" /></div>' +
+            '<button class="btn telebirr-btn" data-action="confirm-telebirr" style="width:100%;margin-top:12px;">Confirm Payment</button>' +
+            '<button class="link-btn" data-action="cancel-telebirr" style="display:block;margin:16px auto 0;">Cancel</button>'
+        ) +
+      '</div>'
+    );
+  }
+  return '';
+}
+
+// ---------------------------------------------------------------- Root render
+function renderMain(){
+  switch(state.view){
+    case 'agents': return renderRoutes(); // merged into routes
+    case 'customers': return renderCustomers();
+    case 'products': return renderProducts();
+    case 'routes': return renderRoutes();
+    case 'routeDetail': return renderRouteDetail();
+    case 'orders': return renderOrders();
+    case 'invoices': return renderInvoices();
+    case 'workspace': return renderWorkspace();
+    default: return renderDashboard();
+  }
+}
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = renderTopnav() + '<div class="main">' + renderMain() + '</div>' + renderModal() +
+    (state.toast ? '<div class="toast">' + esc(state.toast) + '</div>' : '');
+}
+
+// ---------------------------------------------------------------- Event delegation
+document.addEventListener('click', function(e){
+  const backdrop = e.target.closest('[data-action="backdrop"]');
+  if(backdrop && e.target === backdrop){ Actions.closeModal(); return; }
+  
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  const action = el.dataset.action;
+
+  if(action==='nav'){ Actions.nav(el.dataset.view); render(); }
+  else if(action==='open-route'){ Actions.openRoute(el.dataset.id); render(); }
+  else if(action==='open-modal'){ Actions.openModal(el.dataset.modal); render(); }
+  else if(action==='close-modal'){ Actions.closeModal(); }
+  else if(action==='toggle-agent'){ Actions.toggleAgentOnline(el.dataset.id); }
+  else if(action==='quick-order'){ Actions.quickOrder(el.dataset.id); render(); }
+  else if(action==='start-route'){ Actions.startRoute(el.dataset.id); }
+  else if(action==='complete-route'){ Actions.completeRoute(el.dataset.id); }
+  else if(action==='optimize-route'){ Actions.optimizeRoute(el.dataset.id); }
+  else if(action==='visit-stop'){ Actions.visitStop(el.dataset.routeId, el.dataset.stopId); render(); }
+  else if(action==='cart-inc'){ Actions.cartChange(el.dataset.id, 1); }
+  else if(action==='cart-dec'){ Actions.cartChange(el.dataset.id, -1); }
+  else if(action==='start-custom-product'){ Actions.startCustomProduct(); }
+  else if(action==='cancel-custom-product'){ Actions.cancelCustomProduct(); }
+  else if(action==='confirm-custom-product'){ Actions.confirmCustomProduct(); }
+  else if(action==='pay-telebirr'){ Actions.payWithTelebirr(el.dataset.id); }
+  else if(action==='pay-telebirr-standalone'){ Actions.payWithTelebirrStandalone(el.dataset.id); }
+  else if(action==='cancel-telebirr'){ Actions.cancelTelebirr(); }
+  else if(action==='confirm-telebirr'){ Actions.confirmTelebirr(); }
+  else if(action==='submit-order'){ Actions.submitOrder(); }
+  else if(action==='delivery-start'){ Actions.startDelivery(el.dataset.id); }
+  else if(action==='delivery-arrive'){ Actions.arriveDelivery(el.dataset.id); }
+  else if(action==='delivery-confirm'){ Actions.confirmDelivery(el.dataset.id); }
+  else if(action==='resume-order'){ Actions.resumeOrder(el.dataset.id); render(); }
+});
+
+document.addEventListener('change', function(e){
+  const payEl = e.target.closest('[data-action="payment-status"]');
+  if(payEl){ Actions.setPaymentStatus(payEl.dataset.id, payEl.value); return; }
+
+  const qtyEl = e.target.closest('[data-action="cart-input"]');
+  if(qtyEl){ Actions.cartSetQty(qtyEl.dataset.id, qtyEl.value); return; }
+
+  const nameEl = e.target.closest('[data-action="custom-name-input"]');
+  if(nameEl && state.modal){ state.modal.customProductName = nameEl.value; return; }
+
+  const priceEl = e.target.closest('[data-action="custom-price-input"]');
+  if(priceEl && state.modal){ state.modal.customProductPrice = priceEl.value; return; }
+
+  const custQtyEl = e.target.closest('[data-action="custom-qty-input"]');
+  if(custQtyEl && state.modal){ state.modal.customProductQty = custQtyEl.value; return; }
+
+  const phoneEl = e.target.closest('[data-action="telebirr-phone-input"]');
+  if(phoneEl && state.modal){ state.modal.telebirrPhone = phoneEl.value; return; }
+});
+
+document.addEventListener('submit', function(e){
+  const form = e.target.closest('form[data-form]');
+  if(!form) return;
+  e.preventDefault();
+  const fd = new FormData(form);
+  const type = form.dataset.form;
+
+  if(type==='addAgent'){ Actions.addAgent({ name:fd.get('name'), phone:fd.get('phone'), vehicle:fd.get('vehicle') }); }
+  else if(type==='addCustomer'){ Actions.addCustomer({ name:fd.get('name'), phone:fd.get('phone'), address:fd.get('address'), category:fd.get('category') }); }
+  else if(type==='addProduct'){ Actions.addProduct({ name:fd.get('name'), unit:fd.get('unit'), price:fd.get('price') }); }
+  else if(type==='newRoute'){ Actions.createRoute({ name:fd.get('name'), date:fd.get('date'), agentId:fd.get('agentId'), customerIds:fd.getAll('customerIds') }); }
+  else if(type==='workspace'){ Actions.saveWorkspace({ name:fd.get('name'), currency:fd.get('currency') }); }
+});
+
+// ---------------------------------------------------------------- Boot
+render();
+</script>
+</body>
+</html>

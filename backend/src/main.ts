@@ -1,0 +1,30 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    // Required by Better Auth's NestJS integration: it needs the raw,
+    // unparsed request body to verify certain auth flows. The library adds
+    // back Nest's default body parsers for every non-auth route.
+    bodyParser: false,
+  });
+
+  app.enableCors({ origin: true, credentials: true });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+  // Better Auth mounts its own router at basePath ("/api/v1/auth", set in
+  // better-auth.instance.ts) ahead of Nest's own routing/prefix layer, so it
+  // must be excluded here to avoid a doubled-up "/api/v1/api/v1/auth" path.
+  app.setGlobalPrefix('api/v1', { exclude: ['auth/{*path}'] });
+
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`Simuni API running on http://localhost:${port}/api/v1`);
+}
+bootstrap();

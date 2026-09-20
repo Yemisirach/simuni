@@ -1,0 +1,431 @@
+// Simuni — Prisma schema
+// Multi-tenant field sales, GPS route tracking, order collection,
+// delivery & e-invoice platform.
+//
+// AUTH NOTE: authentication/identity/multi-tenancy is handled by Better Auth
+// (see src/auth/better-auth.instance.ts) using its Prisma adapter. The
+// "Better Auth core tables" section below is hand-authored to match the
+// plugins configured there (emailAndPassword + username + phoneNumber +
+// organization + admin). After `npm install`, run:
+//     npx @better-auth/cli generate
+// and diff its output against this file — Better Auth's exact column set
+// can shift slightly between versions, and the generator is the source of
+// truth. This file has not been run against a live database in this
+// environment (no network access here), so treat it as a strong starting
+// point to verify, not a guarantee.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [postgis]
+}
+
+// =====================================================================
+// BETTER AUTH CORE TABLES
+// (identity, sessions, credentials, organizations = "workspaces")
+// =====================================================================
+
+model User {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  emailVerified     Boolean  @default(false)
+  image             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // `username` plugin: agents log in with their phone number, not email.
+  username          String?  @unique
+  displayUsername    String?
+  phoneNumber       String?  @unique
+  phoneNumberVerified Boolean? @default(false)
+
+  // `admin` plugin: lets a workspace OWNER create Manager/Agent accounts
+  // server-side (see users.service.ts) and ban/suspend them.
+  role              String?  @default("user")
+  banned            Boolean? @default(false)
+  banReason         String?
+  banExpires        DateTime?
+
+  sessions    Session[]
+  accounts    Account[]
+  members     Member[]
+  invitations Invitation[]
+
+  agentProfile AgentProfile?
+  routesManaged Route[]      @relation("RouteAgent")
+  orders        Order[]      @relation("OrderAgent")
+  deliveries    Delivery[]   @relation("DeliveryAgent")
+  gpsLogs       GpsLog[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // `organization` plugin: which workspace this session is "acting as".
+  activeOrganizationId String?
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(uuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  @@map("verification")
+}
+
+/// A Better Auth "organization" IS a Simuni "workspace". Domain models
+/// below use `workspaceId` (= Organization.id) for continuity with the
+/// original spec / API shape.
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  metadata  String? // JSON string: e.g. { "currency": "ETB" }
+
+  members     Member[]
+  invitations Invitation[]
+
+  customers Customer[]
+  products  Product[]
+  routes    Route[]
+  orders    Order[]
+  invoices  Invoice[]
+  payments  Payment[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "owner" | "admin" | "member" — mapped to Simuni's OWNER / MANAGER / AGENT
+  // in code (see src/auth/roles.ts) rather than as a Prisma enum, because
+  // the organization plugin manages this column as a plain string.
+  role           String
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String       @default("pending")
+  expiresAt      DateTime
+  inviterId      String
+  inviter        User         @relation(fields: [inviterId], references: [id])
+
+  @@map("invitation")
+}
+
+// =====================================================================
+// SIMUNI DOMAIN MODELS
+// =====================================================================
+
+enum RouteStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum StopStatus {
+  PENDING
+  VISITED
+  SKIPPED
+}
+
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  CONFIRMED
+  CANCELLED
+}
+
+enum OrderSource {
+  AGENT
+  TELEGRAM
+}
+
+enum DeliveryStatus {
+  PENDING
+  IN_TRANSIT
+  ARRIVED
+  DELIVERED
+  FAILED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+model AgentProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  vehicle   String?
+  isOnline  Boolean  @default(false)
+  lastLat   Float?
+  lastLng   Float?
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("agent_profiles")
+}
+
+model Customer {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  name           String
+  phone          String
+  address        String?
+  category       String?
+  lat            Float?
+  lng            Float?
+  /// Set once a customer starts ordering through the Telegram bot (see
+  /// backend/src/telegram/telegram.service.ts). Nullable + unique: most
+  /// customers still come from manual registration by the business.
+  telegramChatId String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stops     RouteStop[]
+  orders    Order[]
+  invoices  Invoice[]
+
+  @@map("customers")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  sku         String?
+  unit        String   @default("pcs")
+  price       Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace  Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model Route {
+  id          String      @id @default(uuid())
+  workspaceId String
+  name        String
+  date        DateTime
+  agentId     String?
+  status      RouteStatus @default(PLANNED)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     User?        @relation("RouteAgent", fields: [agentId], references: [id])
+  stops     RouteStop[]
+  orders    Order[]
+  gpsLogs   GpsLog[]
+
+  @@map("routes")
+}
+
+model RouteStop {
+  id         String     @id @default(uuid())
+  routeId    String
+  customerId String
+  sequence   Int
+  status     StopStatus @default(PENDING)
+  visitedAt  DateTime?
+
+  route    Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([routeId, customerId])
+  @@map("route_stops")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  workspaceId String
+  customerId  String
+  /// Null for customer-initiated orders (e.g. via the Telegram bot) that no
+  /// field agent has collected in person. Whoever calls `POST
+  /// /deliveries/:orderId/start` becomes the delivering agent regardless of
+  /// this field — it only tracks who *collected* the order, not who
+  /// delivers it.
+  agentId     String?
+  routeId     String?
+  status      OrderStatus @default(DRAFT)
+  source      OrderSource @default(AGENT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer  Customer     @relation(fields: [customerId], references: [id])
+  agent     User?        @relation("OrderAgent", fields: [agentId], references: [id])
+  route     Route?       @relation(fields: [routeId], references: [id])
+  items     OrderItem[]
+  delivery  Delivery?
+  invoice   Invoice?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Decimal @db.Decimal(12, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Delivery {
+  id          String         @id @default(uuid())
+  orderId     String         @unique
+  agentId     String
+  status      DeliveryStatus @default(PENDING)
+  startedAt   DateTime?
+  arrivedAt   DateTime?
+  confirmedAt DateTime?
+  lat         Float?
+  lng         Float?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  agent User  @relation("DeliveryAgent", fields: [agentId], references: [id])
+
+  @@map("deliveries")
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  workspaceId   String
+  orderId       String        @unique
+  customerId    String
+  total         Decimal       @db.Decimal(12, 2)
+  paymentStatus PaymentStatus @default(UNPAID)
+  pdfUrl        String?
+  pdfObjectKey  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  order     Order        @relation(fields: [orderId], references: [id])
+  customer  Customer     @relation(fields: [customerId], references: [id])
+  payments  Payment[]
+
+  @@map("invoices")
+}
+
+enum PaymentProvider {
+  TELEBIRR
+}
+
+/// Status of one payment *attempt/transaction* (Telebirr's own trade
+/// lifecycle) — distinct from Invoice.paymentStatus, which reflects the
+/// business's own UNPAID/PARTIAL/PAID bookkeeping and may not move to PAID
+/// until a human reconciles it even after a transaction here is SUCCESS.
+enum PaymentTxnStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+}
+
+/// One Telebirr checkout attempt against an invoice. An invoice can have
+/// more than one row here (e.g. a first attempt expired, the customer tried
+/// again) — `outTradeNo` is what we send Telebirr as our unique order
+/// reference; `providerTradeNo` is Telebirr's own transaction id, filled in
+/// once the notify webhook arrives.
+model Payment {
+  id               String           @id @default(uuid())
+  workspaceId      String
+  invoiceId        String
+  provider         PaymentProvider  @default(TELEBIRR)
+  outTradeNo       String           @unique
+  providerTradeNo  String?
+  amount           Decimal          @db.Decimal(12, 2)
+  status           PaymentTxnStatus @default(PENDING)
+  rawNotifyPayload String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   Invoice      @relation(fields: [invoiceId], references: [id])
+
+  @@map("payments")
+}
+
+model GpsLog {
+  id         String   @id @default(uuid())
+  agentId    String
+  routeId    String?
+  lat        Float
+  lng        Float
+  recordedAt DateTime @default(now())
+
+  agent User   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  route Route? @relation(fields: [routeId], references: [id])
+
+  @@index([agentId, recordedAt])
+  @@map("gps_logs")
+}
