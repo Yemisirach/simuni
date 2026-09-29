@@ -5,9 +5,17 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DeliveriesService {
   constructor(private prisma: PrismaService) {}
 
+  private async resolveWorkspaceId(workspaceId?: string): Promise<string> {
+    if (workspaceId) return workspaceId;
+    const org = await this.prisma.organization.findFirst();
+    if (!org) throw new NotFoundException('No workspace found');
+    return org.id;
+  }
+
   /** "Start delivery" -> creates the Delivery record and marks it in transit. */
   async start(workspaceId: string, orderId: string, agentId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, workspaceId } });
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, workspaceId: wsId } });
     if (!order) throw new NotFoundException('Order not found');
 
     return this.prisma.delivery.upsert({
@@ -40,16 +48,18 @@ export class DeliveriesService {
     return this.prisma.delivery.update({ where: { orderId }, data: { status: 'FAILED' } });
   }
 
-  findAll(workspaceId: string) {
+  async findAll(workspaceId: string) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
     return this.prisma.delivery.findMany({
-      where: { order: { workspaceId } },
+      where: { order: { workspaceId: wsId } },
       include: { order: { include: { customer: true } } },
       orderBy: { startedAt: 'desc' },
     });
   }
 
   private async assertOrderInWorkspace(workspaceId: string, orderId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, workspaceId } });
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, workspaceId: wsId } });
     if (!order) throw new NotFoundException('Order not found');
   }
 }

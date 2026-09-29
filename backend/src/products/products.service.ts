@@ -12,7 +12,10 @@ export class ProductsService {
   }
 
   findAll(workspaceId: string) {
-    return this.prisma.product.findMany({ where: { workspaceId }, orderBy: { name: 'asc' } });
+    return this.prisma.product.findMany({ 
+      where: { workspaceId }, 
+      orderBy: { name: 'asc' } 
+    });
   }
 
   async findOne(workspaceId: string, id: string) {

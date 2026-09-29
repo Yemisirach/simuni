@@ -13,6 +13,7 @@ export function TopNav() {
     { label: 'Orders', path: '/orders' },
     { label: 'Routes', path: '/routes' },
     { label: 'Telegram', path: '/telegram' },
+    { label: 'Factory', path: '/factory-orders' },
     { label: 'Catalog', path: '/catalog' },
     { label: 'Staff', path: '/staff' },
   ];

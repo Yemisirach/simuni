@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -13,11 +13,16 @@ import InvoiceScreen from '../screens/InvoiceScreen';
 import InvoiceListScreen from '../screens/InvoiceListScreen';
 import IngestScreen from '../screens/IngestScreen';
 import HubScreen from '../screens/HubScreen';
+import FactoryOrdersScreen from '../screens/FactoryOrdersScreen';
+
+import CustomerListScreen from '../screens/CustomerListScreen';
+import CreateCustomerScreen from '../screens/CreateCustomerScreen';
+import FieldSurveyScreen from '../screens/FieldSurveyScreen';
 
 export type RoutesStackParamList = {
   RouteList: undefined;
   RouteDetail: { routeId: string; routeName: string };
-  OrderCollection: { customerId: string; customerName: string; routeId: string };
+  OrderCollection: { customerId: string; customerName: string; routeId?: string };
   DeliveryConfirm: { orderId: string; customerName: string };
   Invoice: { orderId: string; customerName: string };
 };
@@ -29,6 +34,7 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const RoutesStack = createNativeStackNavigator<RoutesStackParamList>();
+const CustomersStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const commonHeaderOptions = {
@@ -49,6 +55,17 @@ function RoutesStackNavigator() {
   );
 }
 
+function CustomersStackNavigator() {
+  return (
+    <CustomersStack.Navigator screenOptions={commonHeaderOptions}>
+      <CustomersStack.Screen name="CustomerList" component={CustomerListScreen} options={{ title: "All Customers" }} />
+      <CustomersStack.Screen name="CreateCustomer" component={CreateCustomerScreen} options={{ title: "New Customer" }} />
+      <CustomersStack.Screen name="FieldSurvey" component={FieldSurveyScreen} options={{ title: "Field Survey" }} />
+      <CustomersStack.Screen name="OrderCollection" component={OrderCollectionScreen} options={{ title: 'Ad-Hoc Order' }} />
+    </CustomersStack.Navigator>
+  );
+}
+
 function MainTabNavigator() {
   return (
     <Tab.Navigator
@@ -66,20 +83,25 @@ function MainTabNavigator() {
         },
         tabBarIcon: ({ focused }) => {
           let emoji = '';
-          if (route.name === 'Routes') emoji = '🗺️';
-          else if (route.name === 'Invoices') emoji = '🧾';
-          else if (route.name === 'Ingest') emoji = '📥';
-          else if (route.name === 'Hub') emoji = '⚙️';
-          
+          if (route.name === 'Routes') emoji = '\u{1F69A}';
+          else if (route.name === 'Customers') emoji = '\u{1F465}';
+          else if (route.name === 'Invoices') emoji = '\u{1F9FE}';
+          else if (route.name === 'Survey') emoji = '\u{1F4CD}';
+          else if (route.name === 'Ingest') emoji = '\u{1F4E5}';
+          else if (route.name === 'Hub') emoji = '\u{1F4E1}';
+          else if (route.name === 'Factory') emoji = '\u{1F3ED}';
           return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
         },
         headerShown: false,
       })}
     >
       <Tab.Screen name="Routes" component={RoutesStackNavigator} />
+      <Tab.Screen name="Customers" component={CustomersStackNavigator} />
+      <Tab.Screen name="Survey" component={FieldSurveyScreen} />
       <Tab.Screen name="Invoices" component={InvoiceListScreen} />
       <Tab.Screen name="Ingest" component={IngestScreen} />
       <Tab.Screen name="Hub" component={HubScreen} />
+      <Tab.Screen name="Factory" component={FactoryOrdersScreen} />
     </Tab.Navigator>
   );
 }

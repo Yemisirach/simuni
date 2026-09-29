@@ -1,20 +1,68 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { brand, neutral, spacing, radius, colors, fontFamily } from '../theme';
 import KPICard from '../components/KPICard';
-import SectionHeader from '../components/SectionHeader';
 import AgentRow from '../components/AgentRow';
 import TelemetryIndicator from '../components/TelemetryIndicator';
+import { api, rawRequest } from '../api/client';
 
-export default function HubScreen() {
+export default function HubScreen({ navigation }: any) {
   const currentEAT = new Date().toLocaleTimeString('en-US', { timeZone: 'Africa/Nairobi' });
+  const [workspaceName, setWorkspaceName] = useState('Topwater Ethiopia');
+  const [activeAgents, setActiveAgents] = useState(0);
+  const [activeRoutesList, setActiveRoutesList] = useState<any[]>([]);
+  const [collectedRevenue, setCollectedRevenue] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      // Fetch Workspace & Dashboard Stats in parallel
+      const [ws, stats, routes] = await Promise.all([
+        rawRequest('/workspace/me'),
+        rawRequest('/workspace/dashboard'),
+        rawRequest('/routes')
+      ]);
+      
+      if (ws && ws.name) setWorkspaceName(ws.name);
+      if (stats && typeof stats.collectedRevenue !== 'undefined') {
+        setCollectedRevenue(stats.collectedRevenue);
+      }
+      
+      // Filter Active Routes
+      const inProgress = (routes as any[]).filter(r => r.status === 'IN_PROGRESS');
+      
+      // Unique agents count
+      const uniqueAgents = new Set(inProgress.map(r => r.agentId));
+      setActiveAgents(uniqueAgents.size);
+      
+      setActiveRoutesList(inProgress);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       <View style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 16, paddingBottom: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#111827' }}>ABYSSINIA BEVERAGES ⏷</Text>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#111827' }}>{workspaceName.toUpperCase()} ⏷</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981', marginRight: 4 }} />
               <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: 'bold', letterSpacing: 1 }}>SYNCED • ET-ADD</Text>
@@ -24,9 +72,24 @@ export default function HubScreen() {
             <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }}>
               <Text>🔔</Text>
             </View>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#374151', justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>AB</Text>
-            </View>
+            <TouchableOpacity 
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#374151', justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => {
+                Alert.alert('Account Settings', `Logged in to: ${workspaceName}`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Log Out', 
+                    style: 'destructive', 
+                    onPress: async () => {
+                      await api.logout();
+                      navigation.replace('Login');
+                    } 
+                  }
+                ]);
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>{workspaceName.substring(0, 2).toUpperCase()}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -42,15 +105,15 @@ export default function HubScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kpiRow}>
         <KPICard
           label="COLLECTED REVENUE"
-          value="384,520"
+          value={collectedRevenue.toLocaleString()}
           unit="ETB"
-          trend="+14.8%"
-          subItems={[{ label: 'telebirr SuperApp', value: '312,000 ETB' }, { label: 'Physical Cash Vault', value: '72,520 ETB' }]}
+          trend="0%"
+          subItems={[{ label: 'telebirr SuperApp', value: '0 ETB' }, { label: 'Physical Cash Vault', value: `${collectedRevenue.toLocaleString()} ETB` }]}
         />
         <KPICard
           label="ACTIVE AGENTS"
-          value="18"
-          trend="Live + 1 Buffered"
+          value={activeAgents.toString()}
+          trend={`${activeAgents} Live`}
         />
       </ScrollView>
 
@@ -63,12 +126,8 @@ export default function HubScreen() {
         </View>
         <View style={styles.mapPlaceholder}>
           <Text style={{ fontSize: 40, marginBottom: 8 }}>🗺️</Text>
-          <Text style={styles.mapText}>4 Corridors:</Text>
-          <Text style={styles.mapSubtext}>Mercato, Bole, Piazza, Kaliti</Text>
-          <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981', marginRight: 4 }} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>99.2% Uplink</Text>
-          </View>
+          <Text style={styles.mapText}>{activeRoutesList.length > 0 ? `${activeRoutesList.length} Active Corridors` : 'No Active Corridors'}</Text>
+          <Text style={styles.mapSubtext}>Assign routes to activate map</Text>
         </View>
       </View>
 
@@ -78,33 +137,29 @@ export default function HubScreen() {
           <Text style={{ fontSize: 12, color: '#6B7280', paddingBottom: 2 }}>Tap row to inspect{'\n'}telemetry</Text>
         </View>
         <View style={styles.agentList}>
-          <AgentRow
-            name="Dawit Kebede"
-            vehicle="MB-04"
-            routeInfo="📍 Stop 4 of 6 · Cinema Ras Mart"
-            revenue="84,200 ETB coll."
-            onCall={() => {}}
-            onLocate={() => {}}
-            isOnline={true}
-          />
-          <AgentRow
-            name="Tigist Bekele"
-            vehicle="VAN-02"
-            routeInfo="📍 Stop 5 of 5 · Edna Mall Super"
-            revenue="145,000 ETB coll."
-            onCall={() => {}}
-            onLocate={() => {}}
-            isOnline={true}
-          />
-          <AgentRow
-            name="Henok Mengistu"
-            vehicle="TRK-01"
-            routeInfo="⚠️ 3 OPS pings held offline (Syncing...)"
-            revenue="62,000 ETB coll."
-            onCall={() => {}}
-            onLocate={() => {}}
-            isOnline={false}
-          />
+          {activeRoutesList.length === 0 ? (
+            <Text style={{ textAlign: 'center', color: '#6B7280', padding: 20 }}>No agents currently active in the field.</Text>
+          ) : (
+            activeRoutesList.map((route, i) => {
+              const agentName = route.agent?.user?.name || route.agent?.name || 'Agent';
+              const agentPhone = route.agent?.user?.phoneNumber || route.agent?.user?.phone || route.agent?.phone || 'No phone';
+              const initials = agentName.substring(0, 2).toUpperCase();
+              return (
+                <AgentRow 
+                  key={route.id || i}
+                  initials={initials}
+                  name={agentName}
+                  vehicleTag={route.name}
+                  phone={agentPhone}
+                  location="En Route"
+                  stopInfo={`${route.stops?.filter((s: any) => s.status === 'VISITED').length || 0} of ${route.stops?.length || 0} stops visited`}
+                  revenue="--"
+                  syncStatus="Live"
+                  isOnline={true}
+                />
+              );
+            })
+          )}
         </View>
       </View>
 

@@ -13,8 +13,8 @@ export default function CreateRoutePage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetchApi('/agents').then(setAgents).catch(console.error);
-    fetchApi('/customers').then(setCustomers).catch(console.error);
+    fetchApi<any[]>('/agents').then(setAgents).catch(console.error);
+    fetchApi<any[]>('/customers').then(setCustomers).catch(console.error);
   }, []);
 
   const handleCreate = async (e: any) => {

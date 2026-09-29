@@ -30,11 +30,10 @@ export default function StaffPage() {
   async function loadUsers() {
     setLoading(true);
     try {
-      const data = await fetchApi('/users');
+      const data = await fetchApi<StaffUser[]>('/users');
       setUsers(data);
     } catch (err) {
-      console.error(err);
-      alert('Failed to load staff');
+      console.error('Failed to load staff', err);
     } finally {
       setLoading(false);
     }

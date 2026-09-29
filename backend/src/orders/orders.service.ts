@@ -11,16 +11,24 @@ interface OrderItemInput {
 export class OrdersService {
   constructor(private prisma: PrismaService) {}
 
+  private async resolveWorkspaceId(workspaceId?: string): Promise<string> {
+    if (workspaceId) return workspaceId;
+    const org = await this.prisma.organization.findFirst();
+    if (!org) throw new NotFoundException('No workspace found');
+    return org.id;
+  }
+
   /**
    * "Order Collection" step: agent creates an order, adds products,
    * confirms quantity, submits. Prices are snapshotted from the
    * product catalog at submission time.
    */
   async create(workspaceId: string, agentId: string, dto: CreateOrderDto) {
-    return this.createOrder(workspaceId, {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    return this.createOrder(wsId, {
       customerId: dto.customerId,
-      agentId,
-      routeId: dto.routeId,
+      agentId: agentId || null,
+      routeId: dto.routeId || null,
       items: dto.items,
       source: 'AGENT',
     });
@@ -34,24 +42,66 @@ export class OrdersService {
    * agent independently of who collected the order.
    */
   async createFromTelegram(workspaceId: string, customerId: string, items: OrderItemInput[]) {
-    return this.createOrder(workspaceId, { customerId, agentId: null, routeId: null, items, source: 'TELEGRAM' });
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    let matchedRouteId: string | null = null;
+    
+    if (customer?.zoneId) {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      const activeRoute = await this.prisma.route.findFirst({
+        where: {
+          workspaceId,
+          zoneId: customer.zoneId,
+          status: { in: ['PLANNED', 'IN_PROGRESS'] },
+          date: { gte: startOfDay, lte: endOfDay }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      if (activeRoute) matchedRouteId = activeRoute.id;
+    }
+    
+    return this.createOrder(workspaceId, { customerId, agentId: null, routeId: matchedRouteId, items, source: 'TELEGRAM' });
   }
 
   private async createOrder(
     workspaceId: string,
     params: { customerId: string; agentId: string | null; routeId?: string | null; items: OrderItemInput[]; source: 'AGENT' | 'TELEGRAM' },
   ) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
     const products = await this.prisma.product.findMany({
-      where: { workspaceId, id: { in: params.items.map((i) => i.productId) } },
+      where: { workspaceId: wsId, id: { in: params.items.map((i) => i.productId) } },
     });
     const priceById = new Map(products.map((p) => [p.id, p.price]));
 
+    if (params.routeId) {
+      const existingStop = await this.prisma.routeStop.findUnique({
+        where: { routeId_customerId: { routeId: params.routeId, customerId: params.customerId } },
+      });
+      if (!existingStop) {
+        const lastStop = await this.prisma.routeStop.findFirst({
+          where: { routeId: params.routeId },
+          orderBy: { sequence: 'desc' },
+        });
+        await this.prisma.routeStop.create({
+          data: {
+            routeId: params.routeId,
+            customerId: params.customerId,
+            sequence: (lastStop?.sequence || 0) + 1,
+            status: params.source === 'TELEGRAM' ? 'PENDING' : 'VISITED',
+          }
+        });
+      }
+    }
+
     return this.prisma.order.create({
       data: {
-        workspaceId,
+        workspaceId: wsId,
         customerId: params.customerId,
-        agentId: params.agentId,
-        routeId: params.routeId,
+        agentId: params.agentId || null,
+        routeId: params.routeId || null,
         status: 'SUBMITTED',
         source: params.source,
         items: {
@@ -66,26 +116,29 @@ export class OrdersService {
     });
   }
 
-  findAll(workspaceId: string) {
+  async findAll(workspaceId: string) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
     return this.prisma.order.findMany({
-      where: { workspaceId },
+      where: { workspaceId: wsId },
       include: { customer: true, items: true, delivery: true, invoice: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   /** Orders no field agent has claimed for delivery yet — surfaces Telegram orders that need a driver. */
-  findUnclaimed(workspaceId: string) {
+  async findUnclaimed(workspaceId: string) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
     return this.prisma.order.findMany({
-      where: { workspaceId, delivery: { is: null } },
+      where: { workspaceId: wsId, delivery: { is: null } },
       include: { customer: true, items: { include: { product: true } } },
       orderBy: { createdAt: 'asc' },
     });
   }
 
   async findOne(workspaceId: string, id: string) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
     const order = await this.prisma.order.findFirst({
-      where: { id, workspaceId },
+      where: { id, workspaceId: wsId },
       include: { customer: true, items: { include: { product: true } }, delivery: true, invoice: true },
     });
     if (!order) throw new NotFoundException('Order not found');
@@ -93,7 +146,8 @@ export class OrdersService {
   }
 
   async confirm(workspaceId: string, id: string) {
-    await this.findOne(workspaceId, id);
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    await this.findOne(wsId, id);
     return this.prisma.order.update({ where: { id }, data: { status: 'CONFIRMED' } });
   }
 

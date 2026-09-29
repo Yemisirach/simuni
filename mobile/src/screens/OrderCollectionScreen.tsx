@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { api, isNetworkError } from '../api/client';
 import { queueOrder } from '../offline/queue';
-import { brand, neutral, spacing, radius, fontFamily, colors } from '../theme';
+import { brand, neutral, spacing, radius, fontFamily, colors, shadows } from '../theme';
 
 interface Product {
   id: string;
@@ -25,8 +26,14 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
   const { customerId, customerName, routeId } = route.params;
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Auto-calculator state
+  const [targetAmount, setTargetAmount] = useState('');
+  const [excludedProducts, setExcludedProducts] = useState<Set<string>>(new Set());
+
+  // Custom product flow state
   const [addingCustom, setAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customPrice, setCustomPrice] = useState('');
@@ -34,8 +41,71 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
   const [savingCustom, setSavingCustom] = useState(false);
 
   useEffect(() => {
-    api.products().then(setProducts);
+    api.products()
+      .then(setProducts)
+      .catch((e) => console.error(e))
+      .finally(() => setLoading(false));
   }, []);
+
+  const calculateAssortment = () => {
+    const target = parseFloat(targetAmount);
+    if (isNaN(target) || target <= 0) return Alert.alert('Enter a valid target amount (ETB)');
+
+    const available = products.filter(p => !excludedProducts.has(p.id));
+    if (available.length === 0) return Alert.alert('No products available for calculation');
+
+    // Shuffle products to get a random variety
+    const shuffled = [...available].sort(() => 0.5 - Math.random());
+
+    let remaining = target;
+    const newQuantities: Record<string, number> = {};
+
+    // Try to fit random quantities (up to 3 to ensure variety)
+    for (const p of shuffled) {
+      const price = Number(p.price);
+      if (price > 0 && price <= remaining) {
+        const maxPossible = Math.floor(remaining / price);
+        const qty = Math.min(maxPossible, Math.floor(Math.random() * 3) + 1);
+        if (qty > 0) {
+          newQuantities[p.id] = qty;
+          remaining -= (qty * price);
+        }
+      }
+    }
+
+    // Fill remaining budget with cheapest products
+    const sortedByPrice = [...available].sort((a, b) => Number(a.price) - Number(b.price));
+    while (remaining >= Number(sortedByPrice[0].price)) {
+      for (const p of sortedByPrice) {
+        const price = Number(p.price);
+        if (price <= remaining) {
+          newQuantities[p.id] = (newQuantities[p.id] || 0) + 1;
+          remaining -= price;
+          break;
+        }
+      }
+    }
+    
+    setQuantities(newQuantities);
+    if (remaining > 0) {
+      Alert.alert('Calculation Complete', `Assortment calculated. Remaining change: ${remaining.toFixed(2)} ETB`);
+    } else {
+      Alert.alert('Calculation Complete', `Assortment calculated successfully!`);
+    }
+  };
+
+  const toggleExclude = (productId: string) => {
+    setExcludedProducts(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+    // Optional: if it was excluded, zero out its quantity
+    if (!excludedProducts.has(productId)) {
+      setQuantities(prev => ({ ...prev, [productId]: 0 }));
+    }
+  };
 
   const changeQty = (productId: string, delta: number) => {
     setQuantities((q) => {
@@ -46,7 +116,10 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
 
   const setQtyFromText = (productId: string, text: string) => {
     const digitsOnly = text.replace(/[^0-9]/g, '');
-    setQuantities((q) => ({ ...q, [productId]: digitsOnly === '' ? 0 : parseInt(digitsOnly, 10) }));
+    setQuantities((q) => ({ 
+      ...q, 
+      [productId]: digitsOnly === '' ? ('' as unknown as number) : parseInt(digitsOnly, 10) 
+    }));
   };
 
   const total = products.reduce((sum, p) => sum + Number(p.price) * (quantities[p.id] || 0), 0);
@@ -117,6 +190,24 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
       <Text style={styles.customerLabel}>Order for</Text>
       <Text style={styles.customerName}>{customerName}</Text>
 
+      <View style={styles.calculatorBox}>
+        <Text style={styles.calcLabel}>🎯 Smart Assortment Calculator</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TextInput
+            style={styles.calcInput}
+            placeholder="Target ETB (e.g. 2000)"
+            keyboardType="decimal-pad"
+            value={targetAmount}
+            onChangeText={setTargetAmount}
+            placeholderTextColor={neutral[400]}
+          />
+          <TouchableOpacity style={styles.calcButton} onPress={calculateAssortment}>
+            <Text style={styles.calcButtonText}>Auto-Fill</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.calcSubtext}>Agent: Tap 🚫 to exclude out-of-stock items.</Text>
+      </View>
+
       <FlatList
         style={{ flex: 1 }}
         data={products}
@@ -159,7 +250,7 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
                     onPress={confirmCustomProduct}
                     disabled={savingCustom}
                   >
-                    <Text style={styles.smallButtonPrimaryText}>{savingCustom ? 'Adding…' : 'Add to Order'}</Text>
+                    <Text style={styles.smallButtonPrimaryText}>{savingCustom ? 'Adding...' : 'Add to Order'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.smallButton} onPress={() => setAddingCustom(false)}>
                     <Text style={styles.smallButtonText}>Cancel</Text>
@@ -173,29 +264,38 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
             )}
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.productRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.productName}>{item.name}</Text>
-              <Text style={styles.productPrice}>ETB {Number(item.price).toFixed(2)} / {item.unit}</Text>
-            </View>
-            <View style={styles.stepper}>
-              <TouchableOpacity style={styles.stepperButton} onPress={() => changeQty(item.id, -1)}>
-                <Text style={styles.stepperButtonText}>−</Text>
+        renderItem={({ item }) => {
+          const isExcluded = excludedProducts.has(item.id);
+          return (
+            <View style={[styles.productRow, isExcluded && styles.productRowExcluded]}>
+              <TouchableOpacity style={styles.excludeButton} onPress={() => toggleExclude(item.id)}>
+                <Text style={styles.excludeButtonText}>{isExcluded ? '✅' : '🚫'}</Text>
               </TouchableOpacity>
-              <TextInput
-                style={styles.stepperInput}
-                keyboardType="number-pad"
-                value={String(quantities[item.id] || 0)}
-                onChangeText={(text) => setQtyFromText(item.id, text)}
-                selectTextOnFocus
-              />
-              <TouchableOpacity style={styles.stepperButton} onPress={() => changeQty(item.id, 1)}>
-                <Text style={styles.stepperButtonText}>+</Text>
-              </TouchableOpacity>
+              <View style={{ flex: 1, marginLeft: 8, opacity: isExcluded ? 0.5 : 1 }}>
+                <Text style={[styles.productName, isExcluded && { textDecorationLine: 'line-through' }]}>{item.name}</Text>
+                <Text style={styles.productPrice}>ETB {Number(item.price).toFixed(2)} / {item.unit}</Text>
+              </View>
+              {!isExcluded && (
+                <View style={styles.stepper}>
+                  <TouchableOpacity style={styles.stepperButton} onPress={() => changeQty(item.id, -1)}>
+                    <Text style={styles.stepperButtonText}>-</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.stepperInput}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={neutral[400]}
+                    value={!quantities[item.id] ? '' : String(quantities[item.id])}
+                    onChangeText={(text) => setQtyFromText(item.id, text)}
+                  />
+                  <TouchableOpacity style={styles.stepperButton} onPress={() => changeQty(item.id, 1)}>
+                    <Text style={styles.stepperButtonText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-          </View>
-        )}
+          );
+        }}
       />
 
       <View style={styles.footer}>
@@ -260,4 +360,13 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: brand.gold, borderRadius: radius.sm, paddingVertical: 16, alignItems: 'center' },
   primaryButtonDisabled: { opacity: 0.5 },
   primaryButtonText: { color: brand.black, fontWeight: '700', fontSize: 16 },
+  calculatorBox: { backgroundColor: '#FFFFFF', padding: spacing.md, marginHorizontal: spacing.md, marginTop: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: brand.gold, ...shadows.sm },
+  calcLabel: { fontFamily: fontFamily.sans, fontSize: 14, fontWeight: '700', color: brand.black, marginBottom: spacing.sm },
+  calcInput: { flex: 1, borderWidth: 1, borderColor: neutral[200], borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, backgroundColor: neutral[100] },
+  calcButton: { backgroundColor: brand.gold, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 8 },
+  calcButtonText: { fontWeight: '700', color: brand.black },
+  calcSubtext: { fontSize: 11, color: neutral[500], marginTop: spacing.xs, fontStyle: 'italic' },
+  excludeButton: { padding: 4 },
+  excludeButtonText: { fontSize: 18 },
+  productRowExcluded: { backgroundColor: neutral[100], borderColor: neutral[200], borderWidth: 1 },
 });

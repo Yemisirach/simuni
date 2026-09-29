@@ -12,6 +12,11 @@ export class WorkspaceService {
   constructor(private prisma: PrismaService) {}
 
   async findOne(id: string) {
+    if (!id) {
+      const firstOrg = await this.prisma.organization.findFirst();
+      if (!firstOrg) return null;
+      id = firstOrg.id;
+    }
     const org = await this.prisma.organization.findUnique({ where: { id } });
     if (!org) return null;
     return { id: org.id, name: org.name, slug: org.slug, currency: parseMetadata(org.metadata).currency ?? 'ETB' };
@@ -32,7 +37,7 @@ export class WorkspaceService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [activeAgents, ordersToday, deliveredToday, invoicesToday, unpaidTotal] = await Promise.all([
+    const [activeAgents, ordersToday, deliveredToday, invoicesToday, unpaidTotal, collectedRevenue] = await Promise.all([
       this.prisma.member.count({ where: { organizationId: id, role: 'member', user: { banned: false } } }),
       this.prisma.order.count({ where: { workspaceId: id, createdAt: { gte: today } } }),
       this.prisma.delivery.count({
@@ -43,6 +48,10 @@ export class WorkspaceService {
         where: { workspaceId: id, paymentStatus: { in: ['UNPAID', 'PARTIAL'] } },
         _sum: { total: true },
       }),
+      this.prisma.invoice.aggregate({
+        where: { workspaceId: id, paymentStatus: 'PAID', createdAt: { gte: today } },
+        _sum: { total: true },
+      }),
     ]);
 
     return {
@@ -51,6 +60,7 @@ export class WorkspaceService {
       deliveredToday,
       invoicesToday,
       outstandingBalance: unpaidTotal._sum.total ?? 0,
+      collectedRevenue: collectedRevenue._sum.total ?? 0,
     };
   }
 }

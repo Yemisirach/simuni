@@ -63,8 +63,34 @@ export class RoutingService {
         steps,
       };
     } catch (err) {
-      this.logger.error(`OSRM request failed: ${(err as Error).message}`);
-      return null;
+      this.logger.error(`OSRM request failed: ${(err as Error).message}. Using direct fallback.`);
+      const dLat = ((to.lat - from.lat) * Math.PI) / 180;
+      const dLng = ((to.lng - from.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((from.lat * Math.PI) / 180) *
+          Math.cos((to.lat * Math.PI) / 180) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distanceMeters = Math.round(6371000 * c);
+      const durationSeconds = Math.round((distanceMeters / 25000) * 3600);
+
+      return {
+        distanceMeters,
+        durationSeconds,
+        geometry: [
+          [from.lng, from.lat],
+          [to.lng, to.lat],
+        ],
+        steps: [
+          {
+            instruction: `Head toward customer stop (${(distanceMeters / 1000).toFixed(1)} km)`,
+            distanceMeters,
+            durationSeconds,
+          },
+        ],
+      };
     }
   }
 
@@ -84,9 +110,9 @@ export class RoutingService {
 
     try {
       const res = await fetch(url);
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error(`Status ${res.status}`);
       const data: any = await res.json();
-      if (data.code !== 'Ok') return null;
+      if (data.code !== 'Ok') throw new Error(`Code ${data.code}`);
 
       // waypoints[0] is the fixed start; the rest map back to `stops` by
       // (original index - 1), ordered by OSRM's chosen visiting sequence.
@@ -95,8 +121,14 @@ export class RoutingService {
         .sort((a: any, b: any) => a.trips_index - b.trips_index)
         .map((w: any) => w.waypoint_index - 1);
     } catch (err) {
-      this.logger.error(`OSRM trip request failed: ${(err as Error).message}`);
-      return null;
+      this.logger.error(`OSRM trip request failed: ${(err as Error).message}. Using proximity fallback.`);
+      const dists = stops.map((s, idx) => {
+        const dx = s.lng - start.lng;
+        const dy = s.lat - start.lat;
+        return { idx, dist: dx * dx + dy * dy };
+      });
+      dists.sort((a, b) => a.dist - b.dist);
+      return dists.map((d) => d.idx);
     }
   }
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { MapView, Marker, Polyline } from '../components/MapComponent';
 import * as Location from 'expo-location';
 import { io, Socket } from 'socket.io-client';
 import { api, API_BASE_URL } from '../api/client';

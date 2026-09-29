@@ -1,18 +1,34 @@
+'use client';
+
 import { KPICard } from '@/components/dashboard/KPICard';
 import { routesService } from '@/lib/services/routes.service';
+import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
 import MapWrapper from '@/components/dashboard/MapWrapper';
+import { useEffect, useState } from 'react';
 
-export default async function DashboardPage() {
-  // Fetch active routes from backend (graceful fallback if backend is down)
-  let activeRoutesCount = 0;
-  let routes = [];
-  try {
-    routes = await routesService.getRoutes();
-    activeRoutesCount = routes.filter(r => r.status === 'IN_PROGRESS' || r.status === 'PENDING').length;
-  } catch (error) {
-    console.error("Failed to fetch routes:", error);
-  }
+export default function DashboardPage() {
+  const [routes, setRoutes] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [activeRoutesCount, setActiveRoutesCount] = useState(0);
+
+  useEffect(() => {
+    Promise.all([
+      routesService.getRoutes(),
+      fetchApi<any[]>('/orders')
+    ]).then(([routesData, ordersData]) => {
+      setRoutes(routesData);
+      setActiveRoutesCount(routesData.filter((r: any) => r.status === 'IN_PROGRESS' || r.status === 'PLANNED').length);
+      setOrders(ordersData);
+    }).catch(console.error);
+  }, []);
+
+  const totalInflow = orders.reduce((sum, o) => {
+    return sum + (o.items?.reduce((s: number, i: any) => s + Number(i.price) * i.quantity, 0) || 0);
+  }, 0);
+  
+  const telegramOrders = orders.filter(o => o.source === 'TELEGRAM').length;
+  const pendingOrders = orders.filter(o => o.status === 'DRAFT' || o.status === 'SUBMITTED').length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -20,7 +36,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <div className="text-[10px] font-bold tracking-widest text-text-muted uppercase mb-1">
-            LIVE TELEMETRY · FLEET STREAM · Addis Ababa Hub
+            LIVE TELEMETRY • FLEET STREAM • Addis Ababa Hub
           </div>
           <h1 className="text-2xl md:text-3xl font-bold font-serif text-primary">
             Manager Command & Dispatch Hub
@@ -45,46 +61,44 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <KPICard
           title="TODAY'S FIELD INFLOW"
-          value="412,850"
+          value={totalInflow.toLocaleString()}
           unit="ETB"
-          trend="+22.4% vs Yesterday"
+          trend="Calculated from all orders"
           trendUp={true}
           subItems={[
-            { label: 'telebirr Verified', value: '280,000 ETB' },
-            { label: 'Cash / CDE', value: '132,850 ETB' }
+            { label: 'Total Orders', value: orders.length.toString() }
           ]}
         />
         <KPICard
           title="ACTIVE FIELD AGENTS"
-          value="24"
-          unit="/ 32"
-          trend="8 Agents Offline/Buffer"
-          trendUp={false}
+          value={activeRoutesCount.toString()}
+          unit="Agents"
+          trend="Assigned to routes"
+          trendUp={true}
           subItems={[
-            { label: 'Live GPS Tracking', value: '16' },
-            { label: 'Offline Buffered', value: '8' }
+            { label: 'Active Routes', value: activeRoutesCount.toString() }
           ]}
         />
         <KPICard
           title="DELIVERED DROPS / STOPS"
-          value="142"
-          unit="/ 310"
-          trend="96% SLA Adherence"
+          value="0"
+          unit="/ 0"
+          trend="0% SLA Adherence"
           trendUp={true}
           subItems={[
-            { label: 'Addis Core Sectors', value: '89 Drops' },
-            { label: 'Regional Outskirts', value: '53 Drops' }
+            { label: 'Addis Core Sectors', value: '0 Drops' },
+            { label: 'Regional Outskirts', value: '0 Drops' }
           ]}
         />
         <KPICard
           title="TELEGRAM INBOUND ORDERS"
-          value="18"
+          value={telegramOrders.toString()}
           unit="Orders"
-          trend="4 Pending Assignment"
-          trendUp={false}
+          trend={`${pendingOrders} Pending Assignment`}
+          trendUp={pendingOrders > 0 ? false : true}
           subItems={[
-            { label: 'Claimed & Dispatched', value: '14' },
-            { label: 'Pending / Queued', value: '4' }
+            { label: 'Total Telegram', value: telegramOrders.toString() },
+            { label: 'Pending / Queued', value: pendingOrders.toString() }
           ]}
         />
       </div>
@@ -138,7 +152,7 @@ export default async function DashboardPage() {
                   </div>
                   
                   <Link href={`/routes/${route.id}`} className="text-xs font-bold text-accent hover:underline">
-                    View Turn-by-Turn →
+                    View Turn-by-Turn &rarr;
                   </Link>
                 </div>
               ))

@@ -124,6 +124,7 @@ model Organization {
   logo      String?
   createdAt DateTime @default(now())
   metadata  String? // JSON string: e.g. { "currency": "ETB" }
+  factoryBalance Decimal @db.Decimal(12,2) @default(0)
 
   members     Member[]
   invitations Invitation[]
@@ -134,8 +135,25 @@ model Organization {
   orders    Order[]
   invoices  Invoice[]
   payments  Payment[]
+  zones     Zone[]
+  factoryOrders FactoryOrder[]
+  factoryTransactions FactoryTransaction[]
 
   @@map("organization")
+}
+
+model FactoryTransaction {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  type         String   // TOP_UP or ORDER_DEDUCTION
+  amount       Decimal  @db.Decimal(12,2)
+  balanceAfter Decimal  @db.Decimal(12,2)
+  referenceId  String?
+  date         DateTime @default(now())
+
+  workspace    Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("factory_transactions")
 }
 
 model Member {
@@ -211,6 +229,24 @@ enum PaymentStatus {
   PAID
 }
 
+model Zone {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  minLat      Float
+  maxLat      Float
+  minLng      Float
+  maxLng      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customers   Customer[]
+  routes      Route[]
+
+  @@map("zones")
+}
+
 model AgentProfile {
   id        String   @id @default(uuid())
   userId    String   @unique
@@ -242,6 +278,8 @@ model Customer {
   updatedAt      DateTime @updatedAt
 
   workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  zoneId    String?
+  zone      Zone?    @relation(fields: [zoneId], references: [id], onDelete: SetNull)
   stops     RouteStop[]
   orders    Order[]
   invoices  Invoice[]
@@ -254,15 +292,48 @@ model Product {
   workspaceId String
   name        String
   sku         String?
-  unit        String   @default("pcs")
+  unit        String   @default("pack")
   price       Decimal  @db.Decimal(12, 2)
+  factoryPrice Decimal @db.Decimal(12, 2) @default(0)
+  stock       Int      @default(0)
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   workspace  Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
+  factoryItems FactoryOrderItem[]
 
   @@map("products")
+}
+
+model FactoryOrder {
+  id          String   @id @default(uuid())
+  workspaceId String
+  date        DateTime @default(now())
+  status      String   @default("PENDING") // PENDING, COMPLETED
+  totalBudget Decimal  @db.Decimal(12, 2) @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items     FactoryOrderItem[]
+
+  @@map("factory_orders")
+}
+
+model FactoryOrderItem {
+  id             String   @id @default(uuid())
+  factoryOrderId String
+  productId      String
+  quantity       Int
+  buyPrice       Decimal  @db.Decimal(12, 2)
+  total          Decimal  @db.Decimal(12, 2)
+
+  factoryOrder FactoryOrder @relation(fields: [factoryOrderId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@map("factory_order_items")
 }
 
 model Route {
@@ -276,6 +347,8 @@ model Route {
   updatedAt   DateTime    @updatedAt
 
   workspace Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  zoneId    String?
+  zone      Zone?    @relation(fields: [zoneId], references: [id], onDelete: SetNull)
   agent     User?        @relation("RouteAgent", fields: [agentId], references: [id])
   stops     RouteStop[]
   orders    Order[]

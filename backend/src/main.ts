@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import * as express from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -8,6 +9,14 @@ async function bootstrap() {
     // unparsed request body to verify certain auth flows. The library adds
     // back Nest's default body parsers for every non-auth route.
     bodyParser: false,
+  });
+
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/v1/auth')) {
+      next();
+    } else {
+      express.json()(req, res, next);
+    }
   });
 
   app.enableCors({ origin: true, credentials: true });

@@ -1,7 +1,11 @@
 // Thin fetch wrapper for the Simuni API. Swap API_BASE_URL for your deployed backend.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-export const API_BASE_URL = 'http://10.255.157.145:3000/api/v1';
+const LOCAL_IP = '172.20.10.7';
+export const API_BASE_URL = Platform.OS === 'web' && typeof window !== 'undefined'
+  ? `${window.location.protocol}//${window.location.hostname}:3010/api/v1`
+  : `http://${LOCAL_IP}:3010/api/v1`;
 
 /**
  * Exported (not just used internally) so src/offline/queue.ts can replay a
@@ -9,19 +13,39 @@ export const API_BASE_URL = 'http://10.255.157.145:3000/api/v1';
  */
 export async function rawRequest(path: string, options: RequestInit = {}) {
   const token = await AsyncStorage.getItem('simuni_token');
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || `Request failed: ${res.status}`);
+  const isGet = !options.method || options.method === 'GET';
+  const cacheKey = `simuni_cache_${path}`;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Request failed: ${res.status}`);
+    }
+    
+    const data = await res.json();
+    if (isGet) {
+      // Store data locally (like IndexedDB) for offline access
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+    }
+    return data;
+  } catch (error) {
+    if (isNetworkError(error) && isGet) {
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (cached) {
+        console.log(`[Offline Fallback] Serving ${path} from AsyncStorage`);
+        return JSON.parse(cached);
+      }
+    }
+    throw error;
   }
-  return res.json();
 }
 
 /** True for "the device can't reach the server at all" — as opposed to a 4xx/5xx the server actually answered. */
@@ -38,21 +62,65 @@ export const api = {
    * workspace server-side from their Member row.
    */
   async login(phone: string, password: string) {
-    const res = await fetch(`${API_BASE_URL}/auth/sign-in/username`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: phone, password }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.message || 'Login failed — check your phone number and password.');
+    try {
+      const origin = typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : 'http://localhost:8082';
+
+      const res = await fetch(`${API_BASE_URL}/auth/sign-in/username`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Origin': origin,
+        },
+        body: JSON.stringify({ username: phone, password }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Login failed — check your phone number and password.');
+      }
+      // The bearer plugin returns the session token in this response header.
+      const bearerToken = res.headers.get('set-auth-token');
+      const data = await res.json();
+      const token = bearerToken || data?.token;
+      if (token) await AsyncStorage.setItem('simuni_token', token);
+      if (data?.user?.id) {
+        await AsyncStorage.setItem('simuni_user_id', data.user.id);
+        await AsyncStorage.setItem('simuni_user', JSON.stringify(data.user));
+      }
+      await AsyncStorage.setItem('simuni_saved_phone', phone);
+      await AsyncStorage.setItem('simuni_saved_password', password);
+      return data;
+    } catch (error) {
+      if (isNetworkError(error)) {
+        const savedPhone = await AsyncStorage.getItem('simuni_saved_phone');
+        const savedPassword = await AsyncStorage.getItem('simuni_saved_password');
+        const savedToken = await AsyncStorage.getItem('simuni_token');
+        const savedUserStr = await AsyncStorage.getItem('simuni_user');
+
+        if (savedPhone === phone && savedPassword === password && savedToken) {
+          console.log('[Offline Login] Authenticated using cached offline credentials');
+          return {
+            token: savedToken,
+            user: savedUserStr ? JSON.parse(savedUserStr) : { id: await AsyncStorage.getItem('simuni_user_id') },
+            offline: true,
+          };
+        }
+      }
+      throw error;
     }
-    // The bearer plugin returns the session token in this response header.
-    const bearerToken = res.headers.get('set-auth-token');
-    const data = await res.json();
-    if (bearerToken) await AsyncStorage.setItem('simuni_token', bearerToken);
-    if (data?.user?.id) await AsyncStorage.setItem('simuni_user_id', data.user.id);
-    return data;
+  },
+
+  async logout() {
+    await AsyncStorage.removeItem('simuni_token');
+    await AsyncStorage.removeItem('simuni_user_id');
+    await AsyncStorage.removeItem('simuni_workspace_id');
+    await AsyncStorage.removeItem('simuni_user');
+  },
+
+  async isAuthenticated(): Promise<boolean> {
+    const token = await AsyncStorage.getItem('simuni_token');
+    return !!token;
   },
 
   currentUserId: () => AsyncStorage.getItem('simuni_user_id'),
@@ -88,6 +156,10 @@ export const api = {
   /** Used by OrderCollectionScreen's "add a custom product" flow. */
   createProduct: (name: string, unit: string, price: number) =>
     rawRequest('/products', { method: 'POST', body: JSON.stringify({ name, unit, price }) }),
+    
+  customers: () => rawRequest('/customers'),
+  createCustomer: (data: { name: string; phone: string; address?: string; category?: string; lat?: number; lng?: number }) =>
+    rawRequest('/customers', { method: 'POST', body: JSON.stringify(data) }),
 
   /**
    * NOTE: this throws on any failure, including "device is offline" — it

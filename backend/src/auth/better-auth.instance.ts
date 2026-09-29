@@ -77,7 +77,25 @@ export const auth = betterAuth({
     admin(),
   ],
 
-  trustedOrigins: (process.env.TRUSTED_ORIGINS || 'http://localhost:19006,http://localhost:8081').split(','),
+  advanced: {
+    disableCSRFCheck: true,
+    disableOriginCheck: true,
+  },
+
+  trustedOrigins: [
+    'http://localhost:19006',
+    'http://localhost:8081',
+    'http://localhost:8082',
+    'http://localhost:3000',
+    'http://localhost:3010',
+    'http://127.0.0.1:8082',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3010',
+    'http://172.20.10.7:8082',
+    'http://172.20.10.7:3000',
+    'http://172.20.10.7:3010',
+    ...(process.env.TRUSTED_ORIGINS ? process.env.TRUSTED_ORIGINS.split(',') : []),
+  ],
 });
 
 export type Auth = typeof auth;

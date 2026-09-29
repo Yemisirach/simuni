@@ -7,8 +7,17 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 export class CustomersService {
   constructor(private prisma: PrismaService) {}
 
-  create(workspaceId: string, dto: CreateCustomerDto) {
-    return this.prisma.customer.create({ data: { ...dto, workspaceId } });
+  private async resolveWorkspaceId(workspaceId?: string): Promise<string> {
+    if (workspaceId) return workspaceId;
+    const org = await this.prisma.organization.findFirst();
+    if (!org) throw new NotFoundException('No workspace found');
+    return org.id;
+  }
+
+  async create(workspaceId: string, dto: CreateCustomerDto) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    const phone = dto.phone?.trim() || 'N/A';
+    return this.prisma.customer.create({ data: { ...dto, phone, workspaceId: wsId } });
   }
 
   /** Used by the Telegram bot — finds the customer already linked to this chat, if any. */
@@ -17,19 +26,67 @@ export class CustomersService {
   }
 
   /**
-   * First message from a new Telegram user in a given workspace: registers
+   * Called by the Telegram bot when a user first interacts. We register
    * them as a Customer and links this chat to that record going forward.
    * `phone` may be a Telegram-provided contact share or a typed number.
    */
-  registerFromTelegram(workspaceId: string, chatId: string, name: string, phone: string) {
+  async registerFromTelegram(workspaceId: string, chatId: string, name: string, phone: string, lat?: number, lng?: number) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    let zoneId: string | undefined = undefined;
+    if (lat && lng) {
+      const zones = await this.prisma.zone.findMany({ where: { workspaceId: wsId } });
+      const matchingZone = zones.find(z => 
+        lat >= z.minLat && lat <= z.maxLat && lng >= z.minLng && lng <= z.maxLng
+      );
+      if (matchingZone) zoneId = matchingZone.id;
+    }
+
     return this.prisma.customer.create({
-      data: { workspaceId, name, phone, telegramChatId: chatId, category: 'Telegram' },
+      data: { workspaceId: wsId, name, phone, telegramChatId: chatId, category: 'Telegram', lat, lng, zoneId },
     });
   }
 
-  findAll(workspaceId: string) {
+  async registerShopFromTelegram(data: {
+    workspaceId: string;
+    name: string;
+    phone?: string;
+    category?: string;
+    address?: string;
+    lat: number;
+    lng: number;
+    registeredByChatId?: string;
+  }) {
+    const wsId = await this.resolveWorkspaceId(data.workspaceId);
+    let zoneId: string | undefined = undefined;
+    if (data.lat && data.lng) {
+      const zones = await this.prisma.zone.findMany({ where: { workspaceId: wsId } });
+      const matchingZone = zones.find(z => 
+        data.lat >= z.minLat && data.lat <= z.maxLat && data.lng >= z.minLng && data.lng <= z.maxLng
+      );
+      if (matchingZone) zoneId = matchingZone.id;
+    }
+
+    const phone = data.phone?.trim() || 'N/A';
+    const address = data.address || `GPS: ${data.lat.toFixed(6)}, ${data.lng.toFixed(6)} (Telegram Tag)`;
+
+    return this.prisma.customer.create({
+      data: {
+        workspaceId: wsId,
+        name: data.name,
+        phone,
+        category: data.category || 'RETAIL_SHOP',
+        address,
+        lat: data.lat,
+        lng: data.lng,
+        zoneId,
+      },
+    });
+  }
+
+  async findAll(workspaceId: string) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
     return this.prisma.customer.findMany({
-      where: { workspaceId },
+      where: { workspaceId: wsId },
       orderBy: { createdAt: 'desc' },
     });
   }

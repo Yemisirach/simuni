@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,39 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api/client';
-import { brand, neutral, spacing, radius, colors, fontFamily } from '../theme';
+import { brand, neutral, spacing, radius, fontFamily } from '../theme';
 
 export default function LoginScreen({ navigation }: any) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    async function checkExistingSession() {
+      try {
+        const token = await AsyncStorage.getItem('simuni_token');
+        if (token) {
+          // User already logged in, seamlessly restore session even if offline
+          navigation.replace('MainTabs');
+          return;
+        }
+        const savedPhone = await AsyncStorage.getItem('simuni_saved_phone');
+        if (savedPhone) {
+          setPhone(savedPhone);
+        }
+      } catch (e) {
+        console.error('Session restore error:', e);
+      } finally {
+        setCheckingSession(false);
+      }
+    }
+    checkExistingSession();
+  }, [navigation]);
 
   const handleLogin = async () => {
     if (!phone || !password) {
@@ -35,49 +60,60 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
+  if (checkingSession) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={brand.gold} />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.brand}>
-        <Image source={require('../../assets/logo.jpg')} style={{ width: 80, height: 80, borderRadius: 40, alignSelf: 'center', marginBottom: 16 }} />
-        <Text style={styles.brandTitle}>Simuni</Text>
-        <Text style={styles.brandSubtitle}>Field Agent</Text>
-        <View style={styles.decorativeLine} />
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.brand}>
+          <Image source={require('../../assets/logo.jpg')} style={{ width: 80, height: 80, borderRadius: 40, alignSelf: 'center', marginBottom: 16 }} />
+          <Text style={styles.brandTitle}>Simuni</Text>
+          <Text style={styles.brandSubtitle}>Field Agent</Text>
+          <View style={styles.decorativeLine} />
+        </View>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Phone number</Text>
-        <TextInput
-          style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          placeholder="09XXXXXXXX"
-          placeholderTextColor={neutral[400]}
-        />
+        <View style={styles.form}>
+          <Text style={styles.label}>Phone number</Text>
+          <TextInput
+            style={styles.input}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder="09XXXXXXXX"
+            placeholderTextColor={neutral[400]}
+          />
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="••••••••"
-          placeholderTextColor={neutral[400]}
-        />
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="••••••••"
+            placeholderTextColor={neutral[400]}
+          />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? <ActivityIndicator color={brand.black} /> : <Text style={styles.buttonText}>Log In</Text>}
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+            {loading ? <ActivityIndicator color={brand.black} /> : <Text style={styles.buttonText}>Log In</Text>}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: brand.black, justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: brand.black },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: spacing.xl },
   brand: { alignItems: 'center', marginBottom: spacing.xl },
   brandCircle: {
     width: 64,
