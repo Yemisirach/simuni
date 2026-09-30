@@ -196,4 +196,15 @@ export const api = {
       method: 'PATCH', 
       body: JSON.stringify({ paymentStatus: 'PAID' }) 
     }),
+
+  /** Factory Order APIs */
+  factoryBalance: () => rawRequest('/factory-orders/balance'),
+  factoryOrders: () => rawRequest('/factory-orders'),
+  topUpFactoryBalance: (amount: number) =>
+    rawRequest('/factory-orders/topup', { method: 'POST', body: JSON.stringify({ amount }) }),
+  createFactoryOrder: (items: any[]) =>
+    rawRequest('/factory-orders', { method: 'POST', body: JSON.stringify({ items }) }),
 };
+
+export const fetchApi = rawRequest;
+
