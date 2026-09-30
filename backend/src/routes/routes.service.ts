@@ -27,7 +27,13 @@ export class RoutesService {
   findAll(workspaceId: string) {
     return this.prisma.route.findMany({
       where: { workspaceId },
-      include: { agent: true, stops: true },
+      include: {
+        agent: true,
+        stops: {
+          include: { customer: true },
+          orderBy: { sequence: 'asc' },
+        },
+      },
       orderBy: { date: 'desc' },
     });
   }

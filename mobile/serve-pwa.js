@@ -70,8 +70,10 @@ const server = http.createServer((req, res) => {
 
       res.writeHead(200, {
         'Content-Type': contentType,
-        // Never aggressively cache HTML so updates apply immediately
-        'Cache-Control': isHtml ? 'no-cache, no-store, must-revalidate' : 'public, max-age=31536000',
+        // Never aggressively cache HTML/JS so updates apply immediately
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       });
       res.end(data);
     });

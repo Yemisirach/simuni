@@ -21,6 +21,8 @@ export async function rawRequest(path: string, options: RequestInit = {}) {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
@@ -90,6 +92,8 @@ export const api = {
       }
       await AsyncStorage.setItem('simuni_saved_phone', phone);
       await AsyncStorage.setItem('simuni_saved_password', password);
+      // Flush stale route cache so new corridors appear cleanly
+      await AsyncStorage.removeItem('simuni_cache_/routes');
       return data;
     } catch (error) {
       if (isNetworkError(error)) {
@@ -116,6 +120,9 @@ export const api = {
     await AsyncStorage.removeItem('simuni_user_id');
     await AsyncStorage.removeItem('simuni_workspace_id');
     await AsyncStorage.removeItem('simuni_user');
+    await AsyncStorage.removeItem('simuni_cache_/routes');
+    await AsyncStorage.removeItem('simuni_active_route_id');
+    await AsyncStorage.removeItem('simuni_active_route_name');
   },
 
   async isAuthenticated(): Promise<boolean> {
