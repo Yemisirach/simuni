@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { MapView, Marker, Polyline } from '../components/MapComponent';
 import * as Location from 'expo-location';
 import { io, Socket } from 'socket.io-client';
@@ -14,7 +14,7 @@ interface Stop {
   id: string;
   sequence: number;
   status: 'PENDING' | 'VISITED' | 'SKIPPED';
-  customer: { id: string; name: string; address?: string; lat?: number; lng?: number };
+  customer: { id: string; name: string; address?: string; lat?: number; lng?: number; category?: string };
 }
 
 interface Directions {
@@ -24,6 +24,17 @@ interface Directions {
   durationSeconds: number;
   geometry: [number, number][]; // [lng, lat]
   steps: { instruction: string; distanceMeters: number }[];
+}
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 export default function RouteDetailScreen({ route, navigation }: any) {
@@ -36,10 +47,26 @@ export default function RouteDetailScreen({ route, navigation }: any) {
   const socketRef = useRef<Socket | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
 
+  // Two Tabs: 'preorder' | 'all_shops'
+  const [activeTab, setActiveTab] = useState<'preorder' | 'all_shops'>('preorder');
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [locatingSpot, setLocatingSpot] = useState(false);
+
   const load = async () => {
-    const data = await api.routeDetail(routeId);
-    setStops(data.stops);
-    setStatus(data.status);
+    try {
+      const data = await api.routeDetail(routeId);
+      setStops(data.stops);
+      setStatus(data.status);
+    } catch (e) {
+      console.error(e);
+    }
+    try {
+      const custs = await api.customers();
+      setAllCustomers(custs);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -148,14 +175,68 @@ export default function RouteDetailScreen({ route, navigation }: any) {
     });
   };
 
+  // Instant Live Delivery without Pre-order
+  const handleSpotDelivery = async () => {
+    setLocatingSpot(true);
+    try {
+      let lat: number | undefined = agentPosition?.lat;
+      let lng: number | undefined = agentPosition?.lng;
+
+      if (!lat || !lng) {
+        const { status: perm } = await Location.requestForegroundPermissionsAsync();
+        if (perm === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          lat = loc.coords.latitude;
+          lng = loc.coords.longitude;
+        }
+      }
+
+      navigation.navigate('OrderCollection', {
+        customerId: 'new_spot',
+        customerName: 'Spot Delivery (Auto GPS)',
+        routeId,
+        isSpotSale: true,
+        spotLat: lat,
+        spotLng: lng,
+      });
+    } catch (e: any) {
+      navigation.navigate('OrderCollection', {
+        customerId: 'new_spot',
+        customerName: 'Spot Delivery',
+        routeId,
+        isSpotSale: true,
+      });
+    } finally {
+      setLocatingSpot(false);
+    }
+  };
+
   const withCoords = stops.filter((s) => s.customer.lat && s.customer.lng);
-  
-  // Find current stop
-  const pendingStops = stops.filter(s => s.status === 'PENDING');
+  const pendingStops = stops.filter((s) => s.status === 'PENDING');
   const currentStop = pendingStops.length > 0 ? pendingStops[0] : null;
+
+  // Filter available shops
+  const filteredCustomers = useMemo(() => {
+    let list = allCustomers;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((c) => c.name?.toLowerCase().includes(q) || c.category?.toLowerCase().includes(q) || c.address?.toLowerCase().includes(q));
+    }
+    if (agentPosition) {
+      return [...list].sort((a, b) => {
+        if (!a.lat || !a.lng) return 1;
+        if (!b.lat || !b.lng) return -1;
+        const da = calculateDistance(agentPosition.lat, agentPosition.lng, a.lat, a.lng);
+        const db = calculateDistance(agentPosition.lat, agentPosition.lng, b.lat, b.lng);
+        return da - db;
+      });
+    }
+    return list;
+  }, [allCustomers, searchQuery, agentPosition]);
 
   return (
     <View style={styles.container}>
+      {/* Interactive Map (Web & Mobile) */}
       {withCoords.length > 0 && (
         <View style={styles.mapContainer}>
           <MapView
@@ -198,61 +279,174 @@ export default function RouteDetailScreen({ route, navigation }: any) {
         </View>
       )}
 
-      {directions && directions.steps.length > 0 && (
-        <NavigationBanner directions={directions} />
-      )}
-      
-      {currentStop && (
-        <View style={styles.currentStopCard}>
-          <View style={styles.currentStopHeader}>
-            <Text style={styles.currentStopLabel}>STOP {currentStop.sequence} OF {stops.length}</Text>
-            <StatusBadge variant="gold" label="PRIORITY" />
+      {/* OSRM Navigation Banner */}
+      {directions && directions.steps.length > 0 && <NavigationBanner directions={directions} />}
+
+      {/* Segmented Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'preorder' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('preorder')}
+        >
+          <Text style={[styles.tabText, activeTab === 'preorder' && styles.tabTextActive]}>
+            📋 Pre-order Route ({stops.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'all_shops' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('all_shops')}
+        >
+          <Text style={[styles.tabText, activeTab === 'all_shops' && styles.tabTextActive]}>
+            🏪 All Available Shops ({allCustomers.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* TAB 1: PRE-ORDER ROUTE */}
+      {activeTab === 'preorder' && (
+        <View style={{ flex: 1 }}>
+          {currentStop && (
+            <View style={styles.currentStopCard}>
+              <View style={styles.currentStopHeader}>
+                <Text style={styles.currentStopLabel}>
+                  STOP {currentStop.sequence} OF {stops.length}
+                </Text>
+                <StatusBadge variant="gold" label="PRIORITY" />
+              </View>
+              <Text style={styles.currentStopName}>{currentStop.customer.name}</Text>
+              <Text style={styles.currentStopAddress}>{currentStop.customer.address || 'GPS Tagged'}</Text>
+            </View>
+          )}
+
+          <FlatList
+            style={styles.list}
+            data={stops}
+            keyExtractor={(s) => s.id}
+            renderItem={({ item, index }) => (
+              <TouchableOpacity onPress={() => visitAndOrder(item)} disabled={item.status === 'VISITED'}>
+                <StopTimelineItem
+                  sequence={item.sequence}
+                  customerName={item.customer.name}
+                  address={item.customer.address}
+                  status={item.status}
+                  isCurrent={currentStop?.id === item.id}
+                  isLast={index === stops.length - 1}
+                  outstandingBalance={(item.customer as any).outstandingBalance}
+                />
+              </TouchableOpacity>
+            )}
+          />
+
+          <View style={styles.footer}>
+            {status === 'IN_PROGRESS' && stops.some((s) => s.status === 'PENDING') && (
+              <TouchableOpacity
+                style={[styles.secondaryButton, optimizing && styles.primaryButtonDisabled]}
+                onPress={handleOptimizeRoute}
+                disabled={optimizing}
+              >
+                <Text style={styles.secondaryButtonText}>{optimizing ? 'Optimizing…' : '📍 Suggest Best Route'}</Text>
+              </TouchableOpacity>
+            )}
+            {status === 'PLANNED' && (
+              <TouchableOpacity style={styles.primaryButton} onPress={handleStartRoute}>
+                <Text style={styles.primaryButtonText}>Start Route</Text>
+              </TouchableOpacity>
+            )}
+            {status === 'IN_PROGRESS' && (
+              <TouchableOpacity style={styles.primaryButton} onPress={handleCompleteRoute}>
+                <Text style={styles.primaryButtonText}>Complete Route</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={styles.currentStopName}>{currentStop.customer.name}</Text>
-          <Text style={styles.currentStopAddress}>{currentStop.customer.address}</Text>
         </View>
       )}
 
-      <FlatList
-        style={styles.list}
-        data={stops}
-        keyExtractor={(s) => s.id}
-        renderItem={({ item, index }) => (
-          <TouchableOpacity onPress={() => visitAndOrder(item)} disabled={item.status === 'VISITED'}>
-             <StopTimelineItem
-               sequence={item.sequence}
-               customerName={item.customer.name}
-               address={item.customer.address}
-               status={item.status}
-               isCurrent={currentStop?.id === item.id}
-               isLast={index === stops.length - 1}
-               outstandingBalance={(item.customer as any).outstandingBalance}
-             />
-          </TouchableOpacity>
-        )}
-      />
+      {/* TAB 2: ALL AVAILABLE SHOPS & LIVE ORDERS */}
+      {activeTab === 'all_shops' && (
+        <View style={{ flex: 1 }}>
+          {/* Direct Live Spot Delivery Button */}
+          <View style={styles.spotActionCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.spotActionTitle}>⚡ Live Delivery (No Pre-order)</Text>
+              <Text style={styles.spotActionSubtitle}>Auto-captures live GPS. Deliver & invoice right now on the road.</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.spotActionButton}
+              onPress={handleSpotDelivery}
+              disabled={locatingSpot}
+            >
+              {locatingSpot ? (
+                <ActivityIndicator color={brand.black} size="small" />
+              ) : (
+                <Text style={styles.spotActionButtonText}>+ Deliver Now</Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
-      <View style={styles.footer}>
-        {status === 'IN_PROGRESS' && stops.some((s) => s.status === 'PENDING') && (
-          <TouchableOpacity
-            style={[styles.secondaryButton, optimizing && styles.primaryButtonDisabled]}
-            onPress={handleOptimizeRoute}
-            disabled={optimizing}
-          >
-            <Text style={styles.secondaryButtonText}>{optimizing ? 'Optimizing…' : '📍 Suggest Best Route'}</Text>
-          </TouchableOpacity>
-        )}
-        {status === 'PLANNED' && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleStartRoute}>
-            <Text style={styles.primaryButtonText}>Start Route</Text>
-          </TouchableOpacity>
-        )}
-        {status === 'IN_PROGRESS' && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleCompleteRoute}>
-            <Text style={styles.primaryButtonText}>Complete Route</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {/* Search Bar */}
+          <View style={styles.searchBarContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search shops by name, category, or area..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={neutral[400]}
+            />
+          </View>
+
+          {/* List of Available Shops */}
+          <FlatList
+            style={styles.list}
+            data={filteredCustomers}
+            keyExtractor={(c) => c.id}
+            ListEmptyComponent={
+              <View style={styles.emptyShopsContainer}>
+                <Text style={styles.emptyShopsText}>No shops matching &quot;{searchQuery}&quot;</Text>
+              </View>
+            }
+            renderItem={({ item }) => {
+              const hasGps = item.lat && item.lng;
+              const dist =
+                hasGps && agentPosition
+                  ? calculateDistance(agentPosition.lat, agentPosition.lng, item.lat, item.lng)
+                  : null;
+
+              return (
+                <View style={styles.shopCard}>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.shopHeaderRow}>
+                      <Text style={styles.shopCardTitle}>{item.name}</Text>
+                      {item.category && <Text style={styles.shopCategoryBadge}>{item.category}</Text>}
+                    </View>
+                    <Text style={styles.shopCardAddress}>
+                      {item.address || (hasGps ? `GPS: ${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}` : 'No GPS')}
+                    </Text>
+                    {dist !== null && (
+                      <Text style={styles.shopDistanceText}>
+                        📍 {dist < 1 ? `${Math.round(dist * 1000)} m away` : `${dist.toFixed(1)} km away`}
+                      </Text>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.shopOrderButton}
+                    onPress={() =>
+                      navigation.navigate('OrderCollection', {
+                        customerId: item.id,
+                        customerName: item.name,
+                        routeId,
+                      })
+                    }
+                  >
+                    <Text style={styles.shopOrderButtonText}>📦 Order</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -271,6 +465,36 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   accuracyText: { fontFamily: fontFamily.mono, color: '#FFF', fontSize: 10 },
+
+  // Tabs
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: neutral[200],
+    paddingHorizontal: spacing.sm,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: brand.gold,
+  },
+  tabText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: neutral[500],
+  },
+  tabTextActive: {
+    color: brand.black,
+    fontWeight: '700',
+  },
+
   list: { flex: 1, padding: spacing.md },
   currentStopCard: {
     backgroundColor: '#FFFFFF',
@@ -287,11 +511,143 @@ const styles = StyleSheet.create({
   currentStopAddress: { fontFamily: fontFamily.sans, fontSize: 14, color: neutral[600], marginTop: 2 },
   footer: { padding: spacing.md, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: neutral[200] },
   secondaryButton: {
-    backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: brand.gold,
-    borderRadius: radius.sm, paddingVertical: 14, alignItems: 'center', marginBottom: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: brand.gold,
+    borderRadius: radius.sm,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   secondaryButtonText: { color: brand.gold, fontWeight: '700', fontSize: 15, fontFamily: fontFamily.sans },
   primaryButton: { backgroundColor: brand.gold, borderRadius: radius.sm, paddingVertical: 16, alignItems: 'center' },
   primaryButtonDisabled: { opacity: 0.6 },
   primaryButtonText: { color: brand.black, fontWeight: '700', fontSize: 16, fontFamily: fontFamily.sans },
+
+  // Spot Delivery Card
+  spotActionCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: brand.gold,
+    borderRadius: radius.md,
+    margin: spacing.md,
+    marginBottom: spacing.xs,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  spotActionTitle: {
+    fontFamily: fontFamily.sans,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  spotActionSubtitle: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 2,
+  },
+  spotActionButton: {
+    backgroundColor: brand.gold,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  spotActionButtonText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 13,
+    fontWeight: '800',
+    color: brand.black,
+  },
+
+  // Search
+  searchBarContainer: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  searchInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: neutral[200],
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: brand.black,
+  },
+
+  // Available Shop Row
+  shopCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: neutral[200],
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  shopHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  shopCardTitle: {
+    fontFamily: fontFamily.sans,
+    fontSize: 15,
+    fontWeight: '700',
+    color: brand.black,
+  },
+  shopCategoryBadge: {
+    backgroundColor: neutral[100],
+    color: neutral[600],
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  shopCardAddress: {
+    fontFamily: fontFamily.sans,
+    fontSize: 12,
+    color: neutral[500],
+    marginTop: 2,
+  },
+  shopDistanceText: {
+    fontFamily: fontFamily.mono,
+    fontSize: 11,
+    color: semantic.success,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  shopOrderButton: {
+    backgroundColor: neutral[100],
+    borderWidth: 1,
+    borderColor: brand.gold,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    marginLeft: spacing.sm,
+  },
+  shopOrderButtonText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: brand.black,
+  },
+  emptyShopsContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyShopsText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 13,
+    color: neutral[400],
+  },
 });

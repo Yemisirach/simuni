@@ -23,11 +23,18 @@ interface Product {
 }
 
 export default function OrderCollectionScreen({ route, navigation }: any) {
-  const { customerId, customerName, routeId } = route.params;
+  const { customerId, customerName, routeId, isSpotSale, spotLat, spotLng } = route.params || {};
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Spot sale editable name state
+  const [spotShopName, setSpotShopName] = useState(
+    customerName && customerName !== 'Spot Delivery (Auto GPS)'
+      ? customerName
+      : `Spot Sale ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  );
 
   // Auto-calculator state
   const [targetAmount, setTargetAmount] = useState('');
@@ -167,11 +174,37 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
 
     setSubmitting(true);
     try {
-      const order = await api.createOrder(customerId, items, routeId);
-      navigation.navigate('DeliveryConfirm', { orderId: order.id, customerName });
+      if (isSpotSale) {
+        const finalShopName = spotShopName.trim() || `Spot Shop ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        // 1. Create or link customer with auto-captured GPS
+        const newCustomer = await api.createCustomer({
+          name: finalShopName,
+          phone: 'N/A',
+          category: 'RETAIL_SHOP',
+          lat: spotLat || undefined,
+          lng: spotLng || undefined,
+        });
+
+        // 2. Create the order
+        const order = await api.createOrder(newCustomer.id, items, routeId);
+
+        // 3. Immediately mark delivered and generate invoice
+        await api.startDelivery(order.id);
+        if (spotLat && spotLng) {
+          await api.arriveDelivery(order.id, spotLat, spotLng);
+        }
+        await api.confirmDelivery(order.id);
+        const invoice = await api.generateInvoice(order.id);
+
+        Alert.alert('Sale Completed!', 'Direct spot delivery confirmed. Proceeding to invoice.');
+        navigation.replace('Invoice', { orderId: invoice.id, customerName: finalShopName });
+      } else {
+        const order = await api.createOrder(customerId, items, routeId);
+        navigation.navigate('DeliveryConfirm', { orderId: order.id, customerName });
+      }
     } catch (e: any) {
       if (isNetworkError(e)) {
-        await queueOrder({ customerId, items, routeId });
+        await queueOrder({ customerId: customerId || 'spot_sale', items, routeId });
         Alert.alert(
           'Order saved offline',
           'No connection right now — this order will be submitted automatically once you\'re back online.',
@@ -187,8 +220,29 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.customerLabel}>Order for</Text>
-      <Text style={styles.customerName}>{customerName}</Text>
+      {isSpotSale ? (
+        <View style={styles.spotSaleHeader}>
+          <View style={styles.spotBadgeRow}>
+            <Text style={styles.spotBadge}>⚡ DIRECT LIVE DELIVERY</Text>
+            {spotLat != null && spotLng != null && (
+              <Text style={styles.spotGpsBadge}>📍 GPS: {spotLat.toFixed(4)}, {spotLng.toFixed(4)}</Text>
+            )}
+          </View>
+          <Text style={styles.spotLabel}>Shop Name (Auto GPS captured):</Text>
+          <TextInput
+            style={styles.spotNameInput}
+            value={spotShopName}
+            onChangeText={setSpotShopName}
+            placeholder="e.g. Merkato Kiosk, City Burgers..."
+            placeholderTextColor={neutral[400]}
+          />
+        </View>
+      ) : (
+        <>
+          <Text style={styles.customerLabel}>Order for</Text>
+          <Text style={styles.customerName}>{customerName}</Text>
+        </>
+      )}
 
       <View style={styles.calculatorBox}>
         <Text style={styles.calcLabel}>🎯 Smart Assortment Calculator</Text>
@@ -308,7 +362,13 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
           onPress={submit}
           disabled={!hasItems || submitting}
         >
-          <Text style={styles.primaryButtonText}>{submitting ? 'Submitting…' : 'Submit Order'}</Text>
+          <Text style={styles.primaryButtonText}>
+            {submitting
+              ? 'Processing…'
+              : isSpotSale
+              ? '⚡ Confirm Delivery & Issue Invoice'
+              : 'Submit Order'}
+          </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -316,6 +376,56 @@ export default function OrderCollectionScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  spotSaleHeader: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: brand.gold,
+    ...shadows.sm,
+  },
+  spotBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  spotBadge: {
+    backgroundColor: '#FEF3C7',
+    color: '#92400E',
+    fontWeight: '800',
+    fontSize: 11,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    letterSpacing: 0.5,
+  },
+  spotGpsBadge: {
+    fontFamily: fontFamily.mono,
+    fontSize: 11,
+    color: neutral[600],
+    fontWeight: '600',
+  },
+  spotLabel: {
+    fontFamily: fontFamily.sans,
+    fontSize: 12,
+    color: neutral[600],
+    marginTop: spacing.xs,
+    marginBottom: 4,
+  },
+  spotNameInput: {
+    borderWidth: 1,
+    borderColor: neutral[300],
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontWeight: '700',
+    color: brand.black,
+    backgroundColor: neutral[100],
+  },
   container: { flex: 1, backgroundColor: neutral[100] },
   customerLabel: { fontFamily: fontFamily.sans, fontSize: 12, color: neutral[600], textAlign: 'center', marginTop: spacing.md },
   customerName: { fontFamily: fontFamily.serif, fontSize: 22, fontWeight: '700', color: brand.black, textAlign: 'center' },
