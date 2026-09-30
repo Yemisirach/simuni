@@ -48,47 +48,57 @@ export const MapView = (props: any) => {
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    html, body, #map { margin: 0; padding: 0; width: 100%; height: 100%; }
+    html, body, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #E5E5E3; }
     .custom-pin {
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
       border: 2px solid #FFFFFF;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([${centerLat}, ${centerLng}], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    try {
+      var map = L.map('map', { zoomControl: true, attributionControl: false }).setView([${centerLat}, ${centerLng}], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    var markers = ${markersJson};
-    var polylines = ${polylinesJson};
-    var bounds = [];
+      var markers = ${markersJson};
+      var polylines = ${polylinesJson};
+      var bounds = [];
 
-    markers.forEach(function(m) {
-      var icon = L.divIcon({
-        className: 'custom-pin-wrap',
-        html: '<div class="custom-pin" style="background:' + m.color + '"></div>',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
+      markers.forEach(function(m) {
+        var icon = L.divIcon({
+          className: 'custom-pin-wrap',
+          html: '<div class="custom-pin" style="background:' + m.color + '"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+        var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map);
+        if (m.title) marker.bindPopup('<b>' + m.title + '</b>');
+        bounds.push([m.lat, m.lng]);
       });
-      var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map);
-      if (m.title) marker.bindPopup('<b>' + m.title + '</b>');
-      bounds.push([m.lat, m.lng]);
-    });
 
-    polylines.forEach(function(p) {
-      if (p.coords && p.coords.length > 1) {
-        L.polyline(p.coords, { color: p.color, weight: p.weight, opacity: 0.85 }).addTo(map);
-        p.coords.forEach(function(pt) { bounds.push(pt); });
+      polylines.forEach(function(p) {
+        if (p.coords && p.coords.length > 1) {
+          L.polyline(p.coords, { color: p.color, weight: p.weight, opacity: 0.85 }).addTo(map);
+          p.coords.forEach(function(pt) { bounds.push(pt); });
+        }
+      });
+
+      if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [30, 30] });
+      } else if (bounds.length === 1) {
+        map.setView(bounds[0], 14);
       }
-    });
 
-    if (bounds.length > 1) {
-      map.fitBounds(bounds, { padding: [25, 25] });
+      setTimeout(function() {
+        map.invalidateSize();
+      }, 250);
+    } catch (e) {
+      console.error('Leaflet load error', e);
     }
   </script>
 </body>

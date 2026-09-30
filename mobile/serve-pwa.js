@@ -68,6 +68,28 @@ const server = http.createServer((req, res) => {
         return;
       }
 
+      let outputData = data;
+      if (isHtml) {
+        let htmlStr = data.toString('utf8');
+        // Unregister any stale service workers and caches from previous sessions
+        const swCleaner = `<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    for (var r of regs) { r.unregister(); }
+  });
+}
+if ('caches' in window) {
+  caches.keys().then(function(names) {
+    for (var n of names) { caches.delete(n); }
+  });
+}
+</script>`;
+        htmlStr = htmlStr.replace('</head>', swCleaner + '</head>');
+        // Cache bust script bundle references
+        htmlStr = htmlStr.replace(/src="([^"]+\.js)"/g, 'src="$1?v=' + Date.now() + '"');
+        outputData = Buffer.from(htmlStr, 'utf8');
+      }
+
       res.writeHead(200, {
         'Content-Type': contentType,
         // Never aggressively cache HTML/JS so updates apply immediately
@@ -75,7 +97,7 @@ const server = http.createServer((req, res) => {
         'Pragma': 'no-cache',
         'Expires': '0',
       });
-      res.end(data);
+      res.end(outputData);
     });
   });
 });

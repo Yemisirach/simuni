@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import * as express from 'express';
@@ -32,7 +33,7 @@ async function bootstrap() {
   // must be excluded here to avoid a doubled-up "/api/v1/api/v1/auth" path.
   app.setGlobalPrefix('api/v1', { exclude: ['auth/{*path}'] });
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3010;
   await app.listen(port, '0.0.0.0');
   console.log(`Simuni API running on http://localhost:${port}/api/v1`);
 }
