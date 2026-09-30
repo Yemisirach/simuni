@@ -23,6 +23,23 @@ const server = http.createServer((req, res) => {
   res.setHeader('Service-Worker-Allowed', '/');
 
   let reqPath = decodeURI(req.url.split('?')[0]);
+
+  // Intercept sw.js to automatically flush old service worker caches
+  if (reqPath === '/sw.js') {
+    res.writeHead(200, {
+      'Content-Type': 'application/javascript; charset=UTF-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+    res.end(
+      `self.addEventListener('install', (e) => { self.skipWaiting(); });\n` +
+      `self.addEventListener('activate', (e) => {\n` +
+      `  e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => self.clients.claim()));\n` +
+      `});\n` +
+      `self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });`
+    );
+    return;
+  }
+
   if (reqPath === '/') reqPath = '/index.html';
 
   let filePath = path.join(DIST_DIR, reqPath);
@@ -42,6 +59,7 @@ const server = http.createServer((req, res) => {
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const isHtml = ext === '.html';
 
     fs.readFile(filePath, (readErr, data) => {
       if (readErr) {
@@ -52,8 +70,8 @@ const server = http.createServer((req, res) => {
 
       res.writeHead(200, {
         'Content-Type': contentType,
-        // Service worker should not be cached aggressively by browser
-        'Cache-Control': ext === '.js' && filePath.includes('sw.js') ? 'no-cache' : 'public, max-age=31536000',
+        // Never aggressively cache HTML so updates apply immediately
+        'Cache-Control': isHtml ? 'no-cache, no-store, must-revalidate' : 'public, max-age=31536000',
       });
       res.end(data);
     });
