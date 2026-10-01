@@ -73,6 +73,16 @@ function shiftDate(date: string, days: number) {
   return next.toISOString().slice(0, 10);
 }
 
+function getDayName(dateStr: string): string {
+  try {
+    const d = new Date(`${dateStr}T00:00:00.000Z`);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[d.getUTCDay()] || '';
+  } catch {
+    return '';
+  }
+}
+
 function money(value: number) {
   return `ETB ${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
@@ -409,6 +419,9 @@ export default function IngestScreen() {
         <View style={styles.dateDisplayPill}>
           <Text style={styles.calendarIcon}>🗓️</Text>
           <Text style={styles.dateDisplayText}>{date}</Text>
+          <View style={styles.dayBadge}>
+            <Text style={styles.dayBadgeText}>{getDayName(date)}</Text>
+          </View>
           {report?.hasSnapshot && (
             <View style={styles.savedBadge}>
               <Text style={styles.savedBadgeText}>SAVED</Text>
@@ -1003,6 +1016,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: brand.black,
   },
+  dayBadge: {
+    backgroundColor: neutral[200],
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
+  },
+  dayBadgeText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 10,
+    fontWeight: '700',
+    color: brand.black,
+  },
   savedBadge: {
     backgroundColor: badges.gold.bg,
     paddingHorizontal: 6,
@@ -1028,21 +1053,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: brand.black,
+    backgroundColor: brand.gold,
     borderRadius: radius.md,
     paddingVertical: 11,
     ...shadows.sm,
   },
   recordSalesIcon: {
-    color: neutral[0],
+    color: brand.black,
     fontSize: 14,
     fontWeight: '800',
   },
   recordSalesText: {
     fontFamily: fontFamily.sans,
     fontSize: 12,
-    fontWeight: '700',
-    color: neutral[0],
+    fontWeight: '800',
+    color: brand.black,
   },
   pullYesterdayBtn: {
     flex: 1,
@@ -1429,18 +1454,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   lockButton: {
-    backgroundColor: brand.black,
+    backgroundColor: brand.gold,
     borderRadius: radius.md,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    ...shadows.sm,
   },
   lockButtonText: {
     fontFamily: fontFamily.sans,
     fontSize: 13,
-    fontWeight: '700',
-    color: neutral[0],
+    fontWeight: '800',
+    color: brand.black,
   },
   lockFooterNote: {
     fontFamily: fontFamily.sans,
@@ -1631,15 +1657,16 @@ const styles = StyleSheet.create({
   },
   modalSubmitBtn: {
     flex: 2,
-    backgroundColor: brand.black,
+    backgroundColor: brand.gold,
     borderRadius: radius.sm,
     paddingVertical: 10,
     alignItems: 'center',
+    ...shadows.sm,
   },
   modalSubmitText: {
     fontFamily: fontFamily.sans,
     fontSize: 12,
-    fontWeight: '700',
-    color: neutral[0],
+    fontWeight: '800',
+    color: brand.black,
   },
 });
