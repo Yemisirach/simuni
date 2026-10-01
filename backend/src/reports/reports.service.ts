@@ -58,7 +58,31 @@ export class ReportsService {
     const metadata = this.parseMetadata(org?.metadata);
     const snapshots: Record<string, any> = metadata.dailySalesSnapshots || {};
     const currentSnapshot = snapshots[day];
-    const prevSnapshot = snapshots[prevDay];
+
+    // Compute sequential running stock across historical snapshots prior to this 'day'
+    // so every day's sales continuously and correctly subtract from factory purchases & opening stock
+    const priorDates = Object.keys(snapshots)
+      .filter((d) => d < day)
+      .sort();
+
+    const prevSnapshot = snapshots[prevDay] || (priorDates.length > 0 ? snapshots[priorDates[priorDates.length - 1]] : undefined);
+
+    const runningClosingStockByProduct = new Map<string, number>();
+    for (const d of priorDates) {
+      const snap = snapshots[d];
+      if (Array.isArray(snap?.variants)) {
+        for (const v of snap.variants) {
+          if (!v.productId) continue;
+          const prevClose = runningClosingStockByProduct.get(v.productId) || 0;
+          const snapOpen = v.openingStock !== undefined ? Number(v.openingStock) : 0;
+          const open = snapOpen > 0 ? snapOpen : prevClose;
+          const inflow = Number(v.factoryReceived || 0);
+          const sold = Number(v.soldQty || 0);
+          const close = Math.max(0, open + inflow - sold);
+          runningClosingStockByProduct.set(v.productId, close);
+        }
+      }
+    }
 
     // 2. Fetch all active products in the catalog
     const allProducts = await this.prisma.product.findMany({
@@ -160,22 +184,31 @@ export class ReportsService {
       const prevVariant = prevSnapshot?.variants?.find((v: any) => v.productId === p.id);
 
       // Determine Opening Stock:
-      // Priority 1: Current saved snapshot openingStock
-      // Priority 2: Previous day snapshot's closingStock
-      // Priority 3: For today or future, derived from product.stock (currentStock - receivedToday + soldToday)
-      // For past unrecorded days without snapshots, defaults to 0
+      // Priority 1: Current saved snapshot openingStock (if explicitly set > 0)
+      // Priority 2: Inherited from sequential running closing stock of prior days
+      // Priority 3: Fallback snapshot opening stock
+      // Priority 4: For today or future, derived from product.stock
       const orderSold = orderAgg?.packQty || 0;
       const todayStr = new Date().toISOString().slice(0, 10);
       let openingStock = 0;
-      if (snapshotVariant?.openingStock !== undefined) {
-        openingStock = Number(snapshotVariant.openingStock);
-      } else if (prevVariant?.closingStock !== undefined) {
-        openingStock = Number(prevVariant.closingStock);
+
+      const priorClosing = runningClosingStockByProduct.get(p.id);
+      const snapOpen = snapshotVariant?.openingStock !== undefined ? Number(snapshotVariant.openingStock) : undefined;
+
+      if (snapOpen !== undefined && snapOpen > 0) {
+        openingStock = snapOpen;
+      } else if (priorClosing !== undefined && priorClosing >= 0) {
+        openingStock = priorClosing;
+      } else if (snapOpen !== undefined) {
+        openingStock = snapOpen;
       } else if (day >= todayStr) {
         openingStock = Math.max(0, p.stock - factoryReceived + orderSold);
       } else {
         openingStock = 0;
       }
+
+      // Determine Factory Inflow:
+      const recordedFactoryInflow = snapshotVariant?.factoryReceived !== undefined ? Number(snapshotVariant.factoryReceived) : factoryReceived;
 
       // Determine Sold Quantity:
       // If snapshot recorded a custom physical-count sold qty, respect it; otherwise use actual orders
@@ -185,10 +218,7 @@ export class ReportsService {
 
       // Remaining / Closing stock:
       // Opening + Factory Inflow - Sold
-      let remainingPack = openingStock + factoryReceived - packQty;
-      if (snapshotVariant?.closingStock !== undefined) {
-        remainingPack = Number(snapshotVariant.closingStock);
-      }
+      let remainingPack = Math.max(0, openingStock + recordedFactoryInflow - packQty);
 
       // Pricing
       const sellingPrice = snapshotVariant?.sellingPrice !== undefined ? Number(snapshotVariant.sellingPrice) : (orderAgg && orderAgg.packQty > 0 ? orderAgg.salesAmount / orderAgg.packQty : Number(p.price));
