@@ -11,8 +11,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { api } from '../api/client';
-import { brand, neutral, semantic, spacing, radius, fontFamily, shadows } from '../theme';
+import { api, rawRequest } from '../api/client';
+import {
+  brand,
+  neutral,
+  semantic,
+  badges,
+  spacing,
+  radius,
+  fontFamily,
+  shadows,
+} from '../theme';
 
 interface DailySalesVariant {
   productId: string;
@@ -78,6 +87,7 @@ function getPackSize(nameOrSku: string): number {
 }
 
 export default function IngestScreen() {
+  const [workspaceName, setWorkspaceName] = useState('Workspace');
   const [date, setDate] = useState(todayKey());
   const [report, setReport] = useState<DailySalesReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +109,22 @@ export default function IngestScreen() {
   }>>({});
   const [modalNotes, setModalNotes] = useState('');
   const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
+
+  // Fetch active workspace dynamically from DB/backend
+  useEffect(() => {
+    loadWorkspace();
+  }, []);
+
+  async function loadWorkspace() {
+    try {
+      const ws = await rawRequest('/workspace/me');
+      if (ws && ws.name) {
+        setWorkspaceName(ws.name);
+      }
+    } catch {
+      // Fallback gracefully without breaking
+    }
+  }
 
   useEffect(() => {
     loadReport(date);
@@ -112,7 +137,6 @@ export default function IngestScreen() {
       setError('');
       const data = await api.dailySalesReport(targetDate);
       setReport(data);
-      setIsLocked(!!data?.hasSnapshot);
 
       if (data?.variants) {
         const initInputs: Record<string, any> = {};
@@ -276,7 +300,6 @@ export default function IngestScreen() {
         `Sales & stock ledger for ${targetDate} verified and saved. Database inventory updated.`,
       );
       setModalVisible(false);
-      setIsLocked(true);
       loadReport(date, true);
     } catch (err: any) {
       Alert.alert('Save Failed', err?.message || 'Could not save inventory report.');
@@ -322,6 +345,20 @@ export default function IngestScreen() {
     return `#REC-${clean.slice(2, 6)}`;
   }, [date]);
 
+  const displayOrgName = useMemo(() => {
+    if (!workspaceName) return 'Simuni Workspace';
+    return workspaceName.length > 20 ? `${workspaceName.slice(0, 19)}...` : workspaceName;
+  }, [workspaceName]);
+
+  const orgInitials = useMemo(() => {
+    if (!workspaceName) return 'SW';
+    const words = workspaceName.trim().split(/\s+/);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return workspaceName.slice(0, 2).toUpperCase();
+  }, [workspaceName]);
+
   return (
     <ScrollView
       style={styles.container}
@@ -336,7 +373,7 @@ export default function IngestScreen() {
           </View>
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={styles.orgName}>Abyssinia Beverage...</Text>
+              <Text style={styles.orgName}>{displayOrgName}</Text>
               <Text style={styles.chevronSymbol}>↕</Text>
             </View>
             <Text style={styles.orgSubtitle}>Inventory Reconcile</Text>
@@ -349,10 +386,10 @@ export default function IngestScreen() {
             <Text style={styles.syncText}>SYNCED</Text>
           </View>
           <Pressable style={styles.iconCircle}>
-            <Text style={{ fontSize: 14 }}>🔔</Text>
+            <Text style={{ fontSize: 13 }}>🔔</Text>
           </Pressable>
           <View style={styles.avatarCircle}>
-            <Text style={{ fontSize: 14, color: '#FFFFFF' }}>👤</Text>
+            <Text style={styles.avatarText}>{orgInitials}</Text>
           </View>
         </View>
       </View>
@@ -448,7 +485,7 @@ export default function IngestScreen() {
           <Text style={styles.metricCardSub}>Direct purchase baseline</Text>
         </View>
 
-        {/* Warehouse Stock (Warm Sand card) */}
+        {/* Warehouse Stock (Warm Sand/Cream surface) */}
         <View style={[styles.metricCard, styles.warehouseStockCard]}>
           <View style={styles.metricCardHeader}>
             <Text style={styles.metricCardTitle}>WAREHOUSE STOCK</Text>
@@ -482,14 +519,14 @@ export default function IngestScreen() {
 
           <View style={styles.eqCol}>
             <Text style={styles.eqLabel}>INFLOW</Text>
-            <Text style={[styles.eqValue, { color: '#16A34A' }]}>+{totals.factoryReceived}</Text>
+            <Text style={[styles.eqValue, { color: semantic.successDark }]}>+{totals.factoryReceived}</Text>
           </View>
 
           <Text style={styles.eqOp}>-</Text>
 
           <View style={styles.eqCol}>
             <Text style={styles.eqLabel}>SOLD</Text>
-            <Text style={[styles.eqValue, { color: '#DC2626' }]}>-{totals.packQty}</Text>
+            <Text style={[styles.eqValue, { color: semantic.danger }]}>-{totals.packQty}</Text>
           </View>
 
           <Text style={styles.eqOp}>=</Text>
@@ -522,7 +559,7 @@ export default function IngestScreen() {
             <Text style={styles.channelStatLabel}>Volume Sold:</Text>
             <Text style={styles.channelStatValue}>{report?.sources?.manual?.packQty || 0} pk</Text>
           </View>
-          <View style={[styles.channelStatLine, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+          <View style={[styles.channelStatLine, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: neutral[150] }]}>
             <Text style={styles.channelStatLabel}>Gross Total:</Text>
             <Text style={styles.channelStatBold}>{money(report?.sources?.manual?.salesAmount || 0)}</Text>
           </View>
@@ -542,7 +579,7 @@ export default function IngestScreen() {
             <Text style={styles.channelStatLabel}>Volume Sold:</Text>
             <Text style={styles.channelStatValue}>{report?.sources?.auto?.packQty || 0} pk</Text>
           </View>
-          <View style={[styles.channelStatLine, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+          <View style={[styles.channelStatLine, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: neutral[150] }]}>
             <Text style={styles.channelStatLabel}>Gross Total:</Text>
             <Text style={styles.channelStatBold}>{money(report?.sources?.auto?.salesAmount || 0)}</Text>
           </View>
@@ -592,14 +629,14 @@ export default function IngestScreen() {
                 <Text style={styles.vFlowOp}>+</Text>
                 <View style={styles.vFlowCol}>
                   <Text style={styles.vFlowLabel}>IN</Text>
-                  <Text style={[styles.vFlowValue, v.factoryReceived > 0 && { color: '#16A34A', fontWeight: '800' }]}>
+                  <Text style={[styles.vFlowValue, v.factoryReceived > 0 && { color: semantic.successDark, fontWeight: '800' }]}>
                     +{v.factoryReceived}
                   </Text>
                 </View>
                 <Text style={styles.vFlowOp}>-</Text>
                 <View style={styles.vFlowCol}>
                   <Text style={styles.vFlowLabel}>SOLD</Text>
-                  <Text style={[styles.vFlowValue, v.packQty > 0 && { color: '#DC2626', fontWeight: '800' }]}>
+                  <Text style={[styles.vFlowValue, v.packQty > 0 && { color: semantic.danger, fontWeight: '800' }]}>
                     -{v.packQty}
                   </Text>
                 </View>
@@ -620,7 +657,7 @@ export default function IngestScreen() {
                   Cost: <Text style={styles.boldText}>{money(v.costAmount)}</Text>
                 </Text>
                 {hasSold ? (
-                  <Text style={[styles.variantFinanceText, { color: '#16A34A', fontWeight: '800' }]}>
+                  <Text style={[styles.variantFinanceText, { color: semantic.successDark, fontWeight: '800' }]}>
                     Margin: +{money(v.marginAmount)} ({v.marginPercent}%)
                   </Text>
                 ) : (
@@ -638,7 +675,7 @@ export default function IngestScreen() {
       <View style={styles.ledgerLockCard}>
         <View style={styles.ledgerLockHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Text style={{ color: '#16A34A', fontSize: 13, fontWeight: '800' }}>✓</Text>
+            <Text style={{ color: semantic.successDark, fontSize: 13, fontWeight: '800' }}>✓</Text>
             <Text style={styles.ledgerStatusText}>Ledger Balanced & Ready</Text>
           </View>
           <Text style={styles.ledgerRecId}>RecID: {recordId}</Text>
@@ -650,7 +687,7 @@ export default function IngestScreen() {
           disabled={isSavingSnapshot}
         >
           {isSavingSnapshot ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={neutral[0]} size="small" />
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 13 }}>🔒</Text>
@@ -680,7 +717,7 @@ export default function IngestScreen() {
                 </Text>
               </View>
               <Pressable onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-                <Text style={{ fontSize: 18, color: '#6B7280' }}>✕</Text>
+                <Text style={{ fontSize: 18, color: neutral[500] }}>✕</Text>
               </Pressable>
             </View>
 
@@ -728,7 +765,7 @@ export default function IngestScreen() {
                       </View>
 
                       <View style={styles.mCol}>
-                        <Text style={[styles.mColLabel, { color: '#0F172A', fontWeight: '800' }]}>
+                        <Text style={[styles.mColLabel, { color: brand.black, fontWeight: '800' }]}>
                           = Count
                         </Text>
                         <TextInput
@@ -740,7 +777,7 @@ export default function IngestScreen() {
                       </View>
 
                       <View style={styles.mCol}>
-                        <Text style={[styles.mColLabel, { color: '#DC2626' }]}>Sold Qty</Text>
+                        <Text style={[styles.mColLabel, { color: semantic.danger }]}>Sold Qty</Text>
                         <TextInput
                           style={[styles.mInput, styles.soldMInput]}
                           keyboardType="numeric"
@@ -754,7 +791,7 @@ export default function IngestScreen() {
                       <Text style={styles.modalCalcText}>
                         Sales: <Text style={{ fontWeight: '700' }}>{money(calcSales)}</Text>
                       </Text>
-                      <Text style={[styles.modalCalcText, { color: '#16A34A', fontWeight: '700' }]}>
+                      <Text style={[styles.modalCalcText, { color: semantic.successDark, fontWeight: '700' }]}>
                         Margin: +{money(calcMargin)}
                       </Text>
                     </View>
@@ -788,7 +825,7 @@ export default function IngestScreen() {
                 disabled={isSavingSnapshot}
               >
                 {isSavingSnapshot ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <ActivityIndicator color={neutral[0]} size="small" />
                 ) : (
                   <Text style={styles.modalSubmitText}>Post & Update Ledger</Text>
                 )}
@@ -804,12 +841,12 @@ export default function IngestScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: neutral[100],
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 48,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing['5xl'],
   },
 
   // 1. Top Enterprise App Bar
@@ -817,99 +854,105 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingVertical: 4,
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.xs,
   },
   orgDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   orgIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F1F3F5',
+    width: 34,
+    height: 34,
+    borderRadius: radius.sm,
+    backgroundColor: neutral[200],
     alignItems: 'center',
     justifyContent: 'center',
   },
   orgName: {
     fontFamily: fontFamily.sans,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1E2022',
+    color: brand.black,
   },
   chevronSymbol: {
     fontSize: 10,
-    color: '#6B7280',
+    color: neutral[500],
   },
   orgSubtitle: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
-    color: '#8C9199',
+    color: neutral[500],
     marginTop: 1,
   },
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   syncBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#EAF7EE',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 12,
+    backgroundColor: semantic.successLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
   },
   syncDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#16A34A',
+    backgroundColor: semantic.success,
   },
   syncText: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
     fontWeight: '800',
-    color: '#16A34A',
+    color: semantic.successDark,
     letterSpacing: 0.5,
   },
   iconCircle: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    borderRadius: radius.full,
+    backgroundColor: neutral[0],
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: neutral[200],
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarCircle: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4B5563',
+    borderRadius: radius.full,
+    backgroundColor: brand.darkGray,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    fontWeight: '800',
+    color: neutral[0],
   },
 
   // 2. Page Header
   pageHeader: {
-    marginBottom: 14,
+    marginBottom: spacing.md,
   },
   pageTitle: {
     fontFamily: fontFamily.serif,
     fontSize: 26,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '700',
+    color: brand.black,
     letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontFamily: fontFamily.sans,
     fontSize: 12,
-    color: '#6B7280',
+    color: neutral[600],
     marginTop: 3,
   },
 
@@ -917,16 +960,16 @@ const styles = StyleSheet.create({
   dateBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   dateChevronBtn: {
     width: 36,
     height: 36,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    borderRadius: radius.sm,
+    backgroundColor: neutral[0],
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: neutral[200],
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.sm,
@@ -934,7 +977,7 @@ const styles = StyleSheet.create({
   dateChevronText: {
     fontFamily: fontFamily.sans,
     fontSize: 18,
-    color: '#374151',
+    color: brand.black,
     fontWeight: '600',
   },
   dateDisplayPill: {
@@ -942,13 +985,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
+    gap: spacing.sm,
+    backgroundColor: neutral[0],
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
+    borderColor: neutral[200],
+    borderRadius: radius.sm,
     height: 36,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.md,
     ...shadows.sm,
   },
   calendarIcon: {
@@ -958,26 +1001,26 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.mono,
     fontSize: 13,
     fontWeight: '700',
-    color: '#1F2937',
+    color: brand.black,
   },
   savedBadge: {
-    backgroundColor: '#EEDDBB',
+    backgroundColor: badges.gold.bg,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: radius.xs,
   },
   savedBadgeText: {
     fontFamily: fontFamily.sans,
     fontSize: 9,
     fontWeight: '800',
-    color: '#7A5B18',
+    color: badges.gold.text,
   },
 
   // 4. Action Row: Record Sales / Pull Yesterday
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
+    gap: spacing.sm + 2,
+    marginBottom: spacing.lg,
   },
   recordSalesBtn: {
     flex: 1.2,
@@ -985,13 +1028,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#1E2024',
-    borderRadius: 10,
-    paddingVertical: 10,
+    backgroundColor: brand.black,
+    borderRadius: radius.md,
+    paddingVertical: 11,
     ...shadows.sm,
   },
   recordSalesIcon: {
-    color: '#FFFFFF',
+    color: neutral[0],
     fontSize: 14,
     fontWeight: '800',
   },
@@ -999,7 +1042,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: neutral[0],
   },
   pullYesterdayBtn: {
     flex: 1,
@@ -1007,11 +1050,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    backgroundColor: neutral[0],
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 10,
+    borderColor: neutral[200],
+    paddingVertical: 11,
     ...shadows.sm,
   },
   pullYesterdayIcon: {
@@ -1021,28 +1064,28 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '600',
-    color: '#4B5563',
+    color: neutral[700],
   },
 
   // 5. 2x2 Metric Grid
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 14,
+    gap: spacing.sm + 2,
+    marginBottom: spacing.md,
   },
   metricCard: {
     width: '48.5%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: neutral[0],
+    borderRadius: radius.md,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#ECEEF1',
+    borderColor: neutral[200],
     ...shadows.sm,
   },
   warehouseStockCard: {
-    backgroundColor: '#FDFBF7',
-    borderColor: '#EFE7D6',
+    backgroundColor: brand.cream,
+    borderColor: brand.goldMuted,
   },
   metricCardHeader: {
     flexDirection: 'row',
@@ -1054,7 +1097,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 10,
     fontWeight: '800',
-    color: '#6B7280',
+    color: neutral[600],
     letterSpacing: 0.4,
   },
   metricCardIcon: {
@@ -1070,41 +1113,41 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 11,
     fontWeight: '700',
-    color: '#6B7280',
+    color: neutral[600],
   },
   metricLargeNumber: {
     fontFamily: fontFamily.sans,
     fontSize: 24,
     fontWeight: '800',
-    color: '#111827',
+    color: brand.black,
     letterSpacing: -0.5,
   },
   metricCardSub: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: '#8C9199',
+    color: neutral[500],
   },
   trendBadge: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: semantic.successLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: radius.xs,
   },
   trendText: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
     fontWeight: '800',
-    color: '#15803D',
+    color: semantic.successDark,
   },
 
   // 6. Reconciliation Equilibrium Banner
   equilibriumCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: neutral[0],
+    borderRadius: radius.md,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#ECEEF1',
-    marginBottom: 16,
+    borderColor: neutral[200],
+    marginBottom: spacing.lg,
     ...shadows.sm,
   },
   equilibriumHeader: {
@@ -1117,7 +1160,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 10,
     fontWeight: '800',
-    color: '#6B7280',
+    color: neutral[600],
     letterSpacing: 0.5,
   },
   equilibriumRow: {
@@ -1133,39 +1176,39 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 9,
     fontWeight: '700',
-    color: '#9CA3AF',
+    color: neutral[400],
   },
   eqValue: {
     fontFamily: fontFamily.mono,
     fontSize: 14,
     fontWeight: '800',
-    color: '#111827',
+    color: brand.black,
     marginTop: 2,
   },
   eqOp: {
     fontFamily: fontFamily.sans,
     fontSize: 14,
     fontWeight: '700',
-    color: '#D1D5DB',
+    color: neutral[300],
   },
   eqCloseBox: {
     alignItems: 'center',
     flex: 1.1,
-    backgroundColor: '#EFE7D6',
-    borderRadius: 6,
+    backgroundColor: badges.gold.bg,
+    borderRadius: radius.xs,
     paddingVertical: 4,
   },
   eqCloseLabel: {
     fontFamily: fontFamily.sans,
     fontSize: 9,
     fontWeight: '800',
-    color: '#7A5B18',
+    color: badges.gold.text,
   },
   eqCloseValue: {
     fontFamily: fontFamily.mono,
     fontSize: 15,
     fontWeight: '900',
-    color: '#7A5B18',
+    color: badges.gold.text,
     marginTop: 1,
   },
 
@@ -1174,32 +1217,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
     marginTop: 4,
   },
   sectionHeading: {
-    fontFamily: fontFamily.sans,
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#111827',
+    fontFamily: fontFamily.serif,
+    fontSize: 16,
+    fontWeight: '700',
+    color: brand.black,
   },
   sectionMetaRight: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: '#8C9199',
+    color: neutral[500],
   },
   channelsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
+    gap: spacing.sm + 2,
+    marginBottom: spacing.lg,
   },
   channelCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: neutral[0],
+    borderRadius: radius.md,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#ECEEF1',
+    borderColor: neutral[200],
     ...shadows.sm,
   },
   channelTitleRow: {
@@ -1212,7 +1255,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '700',
-    color: '#1F2937',
+    color: brand.black,
   },
   channelStatLine: {
     flexDirection: 'row',
@@ -1222,42 +1265,42 @@ const styles = StyleSheet.create({
   channelStatLabel: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: '#6B7280',
+    color: neutral[600],
   },
   channelStatValue: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
     fontWeight: '600',
-    color: '#111827',
+    color: brand.black,
   },
   channelStatBold: {
     fontFamily: fontFamily.mono,
     fontSize: 11,
     fontWeight: '800',
-    color: '#111827',
+    color: brand.black,
   },
 
   // 8. Variant Stock & Margins Section
   reconcileAllPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EAE2D2',
-    paddingHorizontal: 8,
+    backgroundColor: badges.gold.bg,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: radius.xs,
   },
   reconcileAllText: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
     fontWeight: '700',
-    color: '#6E5316',
+    color: badges.gold.text,
   },
   variantItemCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: neutral[0],
+    borderRadius: radius.md,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#ECEEF1',
+    borderColor: neutral[200],
     marginBottom: 10,
     ...shadows.sm,
   },
@@ -1267,29 +1310,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   variantItemName: {
-    fontFamily: fontFamily.sans,
+    fontFamily: fontFamily.serif,
     fontSize: 15,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '700',
+    color: brand.black,
   },
   editPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: neutral[100],
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: radius.xs,
   },
   editPillText: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
     fontWeight: '600',
-    color: '#374151',
+    color: neutral[700],
   },
   variantPricingSub: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: '#6B7280',
+    color: neutral[600],
     marginTop: 2,
     marginBottom: 8,
   },
@@ -1297,11 +1340,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
+    backgroundColor: neutral[50],
+    borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 10,
+    borderColor: neutral[200],
+    paddingHorizontal: spacing.sm + 2,
     paddingVertical: 6,
     marginBottom: 8,
   },
@@ -1313,58 +1356,58 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 8,
     fontWeight: '700',
-    color: '#9CA3AF',
+    color: neutral[400],
   },
   vFlowValue: {
     fontFamily: fontFamily.mono,
     fontSize: 12,
     fontWeight: '700',
-    color: '#1F2937',
+    color: brand.black,
     marginTop: 1,
   },
   vFlowOp: {
     fontFamily: fontFamily.sans,
     fontSize: 12,
-    color: '#9CA3AF',
+    color: neutral[400],
   },
   vFlowRemBadge: {
-    backgroundColor: '#EAE2D2',
+    backgroundColor: badges.gold.bg,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 5,
+    borderRadius: radius.xs,
   },
   vFlowRemText: {
     fontFamily: fontFamily.mono,
     fontSize: 11,
-    color: '#6E5316',
+    color: badges.gold.text,
   },
   variantFinanceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: neutral[150],
   },
   variantFinanceText: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: '#6B7280',
+    color: neutral[600],
   },
   boldText: {
     fontFamily: fontFamily.mono,
     fontWeight: '700',
-    color: '#111827',
+    color: brand.black,
   },
 
   // 9. Bottom Ledger Lock Card
   ledgerLockCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
+    backgroundColor: neutral[0],
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
     borderWidth: 1,
-    borderColor: '#ECEEF1',
-    marginTop: 8,
-    marginBottom: 20,
+    borderColor: neutral[200],
+    marginTop: spacing.sm,
+    marginBottom: spacing['2xl'],
     ...shadows.sm,
   },
   ledgerLockHeader: {
@@ -1377,17 +1420,17 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '700',
-    color: '#1F2937',
+    color: brand.black,
   },
   ledgerRecId: {
     fontFamily: fontFamily.mono,
     fontSize: 11,
-    color: '#6B7280',
+    color: neutral[600],
     fontWeight: '600',
   },
   lockButton: {
-    backgroundColor: '#23272E',
-    borderRadius: 10,
+    backgroundColor: brand.black,
+    borderRadius: radius.md,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1397,54 +1440,54 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 13,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: neutral[0],
   },
   lockFooterNote: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
-    color: '#8C9199',
+    color: neutral[500],
     textAlign: 'center',
   },
 
-  // Loading
+  // Loading & Error
   loadingBox: {
     alignItems: 'center',
-    padding: 24,
+    padding: spacing.xl,
   },
   loadingText: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     fontFamily: fontFamily.sans,
     fontSize: 12,
-    color: '#6B7280',
+    color: neutral[600],
   },
   errorCard: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 10,
-    padding: 12,
+    backgroundColor: semantic.dangerLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
     borderWidth: 1,
     borderColor: '#FECACA',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   errorTitle: {
-    color: '#991B1B',
+    color: semantic.dangerDark,
     fontSize: 13,
     fontWeight: '700',
   },
   errorText: {
-    color: '#7F1D1D',
+    color: semantic.dangerDark,
     fontSize: 11,
     marginTop: 2,
   },
   retryButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#991B1B',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: semantic.dangerDark,
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     marginTop: 6,
   },
   retryButtonText: {
-    color: '#FFFFFF',
+    color: neutral[0],
     fontWeight: '700',
     fontSize: 11,
   },
@@ -1454,13 +1497,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: 16,
+    padding: spacing.lg,
   },
   modalBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: neutral[0],
+    borderRadius: radius.lg,
     maxHeight: '88%',
-    padding: 16,
+    padding: spacing.lg,
     ...shadows.lg,
   },
   modalHeader: {
@@ -1468,20 +1511,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: neutral[200],
     paddingBottom: 10,
     marginBottom: 10,
   },
   modalTitle: {
-    fontFamily: fontFamily.sans,
+    fontFamily: fontFamily.serif,
     fontSize: 16,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '700',
+    color: brand.black,
   },
   modalSubtitle: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: '#6B7280',
+    color: neutral[600],
     marginTop: 2,
   },
   modalCloseBtn: {
@@ -1492,11 +1535,11 @@ const styles = StyleSheet.create({
   },
   modalVariantCard: {
     borderWidth: 1,
-    borderColor: '#ECEEF1',
-    borderRadius: 10,
+    borderColor: neutral[200],
+    borderRadius: radius.sm,
     padding: 10,
     marginBottom: 8,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: neutral[50],
   },
   modalVCardTop: {
     flexDirection: 'row',
@@ -1505,15 +1548,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   modalVCardTitle: {
-    fontFamily: fontFamily.sans,
+    fontFamily: fontFamily.serif,
     fontSize: 13,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '700',
+    color: brand.black,
   },
   modalVCardPill: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
-    color: '#6B7280',
+    color: neutral[600],
   },
   modalInputGrid: {
     flexDirection: 'row',
@@ -1526,30 +1569,30 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 9,
     fontWeight: '700',
-    color: '#6B7280',
+    color: neutral[600],
     marginBottom: 3,
   },
   mInput: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: neutral[0],
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 6,
+    borderColor: neutral[300],
+    borderRadius: radius.xs,
     paddingHorizontal: 6,
     paddingVertical: 5,
     fontFamily: fontFamily.mono,
     fontSize: 13,
-    color: '#111827',
+    color: brand.black,
     textAlign: 'center',
   },
   highlightMInput: {
-    borderColor: '#C4A35A',
-    backgroundColor: '#FDFBF4',
+    borderColor: brand.gold,
+    backgroundColor: brand.cream,
     fontWeight: '800',
   },
   soldMInput: {
-    borderColor: '#F87171',
-    backgroundColor: '#FEF2F2',
-    color: '#B91C1C',
+    borderColor: semantic.danger,
+    backgroundColor: semantic.dangerLight,
+    color: semantic.dangerDark,
     fontWeight: '800',
   },
   modalCalcRow: {
@@ -1558,25 +1601,25 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: neutral[200],
   },
   modalCalcText: {
     fontFamily: fontFamily.mono,
     fontSize: 11,
-    color: '#374151',
+    color: neutral[700],
   },
   modalFooter: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.md,
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: neutral[200],
   },
   modalCancelBtn: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    backgroundColor: neutral[100],
+    borderRadius: radius.sm,
     paddingVertical: 10,
     alignItems: 'center',
   },
@@ -1584,12 +1627,12 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '600',
-    color: '#4B5563',
+    color: neutral[700],
   },
   modalSubmitBtn: {
     flex: 2,
-    backgroundColor: '#1E2024',
-    borderRadius: 8,
+    backgroundColor: brand.black,
+    borderRadius: radius.sm,
     paddingVertical: 10,
     alignItems: 'center',
   },
@@ -1597,6 +1640,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: neutral[0],
   },
 });
