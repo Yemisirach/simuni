@@ -23,28 +23,29 @@ export class InvoicesService {
    * still gets created/updated so the workflow isn't blocked; the PDF can
    * be regenerated later via `regeneratePdf`.
    */
-  async generate(workspaceId: string, orderId: string) {
+  async generate(workspaceId: string | undefined, orderId: string) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, workspaceId },
+      where: { id: orderId, ...(workspaceId ? { workspaceId } : {}) },
       include: { items: { include: { product: true } }, customer: true, agent: true },
     });
     if (!order) throw new NotFoundException('Order not found');
+    const wsId = workspaceId || order.workspaceId;
 
     const total = order.items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
 
     const invoice = await this.prisma.invoice.upsert({
       where: { orderId },
-      create: { workspaceId, orderId, customerId: order.customerId, total, paymentStatus: 'UNPAID' },
+      create: { workspaceId: wsId, orderId, customerId: order.customerId, total, paymentStatus: 'UNPAID' },
       update: { total },
     });
 
     try {
-      await this.regeneratePdf(workspaceId, invoice.id);
+      await this.regeneratePdf(wsId, invoice.id);
     } catch (err) {
       this.logger.warn(`Invoice ${invoice.id} created without a PDF (storage unavailable): ${(err as Error).message}`);
     }
 
-    return this.findOne(workspaceId, invoice.id);
+    return this.findOne(wsId, invoice.id);
   }
 
   /** Re-renders the PDF for an existing invoice and re-uploads it to MinIO. */

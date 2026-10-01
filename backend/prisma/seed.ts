@@ -65,10 +65,10 @@ async function main() {
 
   // 4. Create Products (Topwater)
   const productsData = [
-    { name: 'Topwater 0.35L', sku: 'TOP-0.35L', price: 200.00 },
-    { name: 'Topwater 0.6L', sku: 'TOP-0.6L', price: 250.00 },
-    { name: 'Topwater 1L', sku: 'TOP-1L', price: 200.00 },
-    { name: 'Topwater 2L', sku: 'TOP-2L', price: 250.00 },
+    { name: 'Topwater 0.35L', sku: 'TOP-0.35L', price: 252.00 },
+    { name: 'Topwater 0.6L', sku: 'TOP-0.6L', price: 300.00 },
+    { name: 'Topwater 1L', sku: 'TOP-1L', price: 252.00 },
+    { name: 'Topwater 2L', sku: 'TOP-2L', price: 300.00 },
   ];
 
   const products: any[] = [];

@@ -24,7 +24,6 @@ export class WorkspaceContextGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const session = request.session;
-    console.log('DEBUG WorkspaceContextGuard session:', session ? { hasUser: !!session.user, user: session.user } : 'NO_SESSION');
 
     // Better Auth's own guard should already have rejected unauthenticated
     // requests; this is a defensive fallback (e.g. for @AllowAnonymous()

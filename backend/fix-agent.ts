@@ -1,8 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { auth } from './src/auth/better-auth.instance';
-import { getNeonAdapter } from './src/prisma/prisma-client';
+import { getPrismaClientOptions } from './src/prisma/prisma-client';
 
-const prisma = new PrismaClient({ adapter: getNeonAdapter() });
+const prisma = new PrismaClient(getPrismaClientOptions() as any);
 
 async function fix() {
   console.log('Fixing agent account...');
@@ -45,7 +45,7 @@ async function fix() {
     }
   });
 
-  console.log(`✅ Driver fixed! Phone: ${phone}, Password: ${password}`);
+  console.log(`✅ Driver fixed! Phone: ${phone}`);
 }
 
 fix().catch(console.error).finally(() => prisma.$disconnect());

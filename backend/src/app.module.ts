@@ -19,6 +19,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { GpsModule } from './gps/gps.module';
 import { FactoryOrdersModule } from './factory-orders/factory-orders.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { FactoryOrdersModule } from './factory-orders/factory-orders.module';
     TelegramModule,
     GpsModule,
     FactoryOrdersModule,
+    ReportsModule,
   ],
   providers: [
     // Order matters: Better Auth's own guard runs first (rejects requests

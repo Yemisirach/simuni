@@ -4,6 +4,7 @@ const path = require('path');
 
 const PORT = 8082;
 const DIST_DIR = path.join(__dirname, 'dist');
+const API_TARGET = process.env.API_TARGET || 'http://127.0.0.1:3010';
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',
@@ -23,6 +24,28 @@ const server = http.createServer((req, res) => {
   res.setHeader('Service-Worker-Allowed', '/');
 
   let reqPath = decodeURI(req.url.split('?')[0]);
+
+  if (reqPath.startsWith('/api/')) {
+    const target = new URL(req.url, API_TARGET);
+    const proxyReq = http.request(
+      target,
+      {
+        method: req.method,
+        headers: { ...req.headers, host: target.host },
+      },
+      (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+        proxyRes.pipe(res);
+      },
+    );
+
+    proxyReq.on('error', (error) => {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: `Backend unavailable: ${error.message}` }));
+    });
+    req.pipe(proxyReq);
+    return;
+  }
 
   // Intercept sw.js to automatically flush old service worker caches
   if (reqPath === '/sw.js') {

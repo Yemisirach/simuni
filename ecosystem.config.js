@@ -16,12 +16,12 @@ module.exports = {
     {
       name: 'simuni-web',
       script: path.resolve(__dirname, 'web/node_modules/next/dist/bin/next'),
-      args: 'dev -p 3011',
+      args: 'dev -p 3012',
       cwd: path.resolve(__dirname, 'web'),
       instances: 1,
       exec_mode: 'fork',
       env: {
-        PORT: 3011,
+        PORT: 3012,
       },
     },
     {

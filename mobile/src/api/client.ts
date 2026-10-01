@@ -3,9 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const LOCAL_IP = '172.20.10.7';
-export const API_BASE_URL = Platform.OS === 'web' && typeof window !== 'undefined'
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || (Platform.OS === 'web' && typeof window !== 'undefined'
   ? `${window.location.protocol}//${window.location.hostname}:3010/api/v1`
-  : `http://${LOCAL_IP}:3010/api/v1`;
+  : `http://${LOCAL_IP}:3010/api/v1`);
 
 /**
  * Exported (not just used internally) so src/offline/queue.ts can replay a
@@ -204,7 +204,9 @@ export const api = {
     rawRequest('/factory-orders/topup', { method: 'POST', body: JSON.stringify({ amount }) }),
   createFactoryOrder: (items: any[]) =>
     rawRequest('/factory-orders', { method: 'POST', body: JSON.stringify({ items }) }),
+
+  dailySalesReport: (date?: string) =>
+    rawRequest(`/reports/daily-sales${date ? `?date=${encodeURIComponent(date)}` : ''}`),
 };
 
 export const fetchApi = rawRequest;
-

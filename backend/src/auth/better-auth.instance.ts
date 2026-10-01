@@ -3,13 +3,13 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { organization, admin, username, phoneNumber, bearer } from 'better-auth/plugins';
 import { PrismaClient } from '@prisma/client';
 
-import { getNeonAdapter } from '../prisma/prisma-client';
+import { getPrismaClientOptions } from '../prisma/prisma-client';
 
 // Better Auth wants its own PrismaClient instance to introspect the models
 // above (User, Session, Account, Verification, Organization, Member,
 // Invitation) — it's fine for this to be separate from PrismaService, which
 // the rest of the app uses for domain queries; both point at the same DB.
-const prisma = new PrismaClient({ adapter: getNeonAdapter() });
+const prisma = new PrismaClient(getPrismaClientOptions() as any);
 
 /**
  * The single Better Auth instance for the whole API.

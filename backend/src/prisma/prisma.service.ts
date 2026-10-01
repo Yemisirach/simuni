@@ -1,11 +1,11 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
-import { getNeonAdapter } from './prisma-client';
+import { getPrismaClientOptions } from './prisma-client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
-    super({ adapter: getNeonAdapter() } as any);
+    super(getPrismaClientOptions() as any);
   }
 
   async onModuleInit() {

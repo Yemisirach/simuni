@@ -1,0 +1,20 @@
+services:
+  simuni-postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: simuni
+      POSTGRES_PASSWORD: simuni
+      POSTGRES_DB: simuni
+    ports:
+      - "55432:5432"
+    volumes:
+      - simuni_postgres_hosting_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U simuni"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  simuni_postgres_hosting_data:
