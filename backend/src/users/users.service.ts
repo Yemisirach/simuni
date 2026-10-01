@@ -15,13 +15,19 @@ export class UsersService {
    * workspace with the requested role.
    */
   async create(workspaceId: string, dto: CreateUserDto) {
-    const email = dto.email || `${dto.phone}@users.simuni.app`;
+    const cleanPhone = (dto.phone || '').replace(/[\s\-\+\(\)]/g, '');
+    if (cleanPhone.length < 6) {
+      throw new BadRequestException('Phone number must have at least 6 digits.');
+    }
+    const email = dto.email || `${cleanPhone}@users.simuni.app`;
 
     let userId: string;
     const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [
           { email },
+          { username: cleanPhone },
+          { phoneNumber: cleanPhone },
           { username: dto.phone },
           { phoneNumber: dto.phone },
         ],
@@ -41,7 +47,7 @@ export class UsersService {
       });
     } else {
       const signUpResult = await auth.api.signUpEmail({
-        body: { email, password: dto.password, name: dto.name, username: dto.phone } as any,
+        body: { email, password: dto.password, name: dto.name, username: cleanPhone } as any,
       });
       userId = (signUpResult as any).user.id;
 
@@ -50,10 +56,10 @@ export class UsersService {
       });
     }
 
-    // Ensure phoneNumber is set for phone login
+    // Ensure phoneNumber and username are set to clean digits for phone login
     await this.prisma.user.update({
       where: { id: userId },
-      data: { phoneNumber: dto.phone, name: dto.name },
+      data: { phoneNumber: cleanPhone, username: cleanPhone, name: dto.name },
     });
 
     if (dto.role === 'AGENT') {

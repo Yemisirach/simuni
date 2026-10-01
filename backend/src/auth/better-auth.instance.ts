@@ -55,8 +55,10 @@ export const auth = betterAuth({
     bearer(),
     username({
       // Agents type their phone number into the "username" field on the
-      // mobile login screen; nothing else changes about the flow.
+      // mobile login screen; normalize phone formats (spaces, dashes, plus)
       minUsernameLength: 6,
+      usernameValidator: (val) => /^[a-zA-Z0-9_.+\s-]+$/.test(val),
+      usernameNormalization: (val) => val.replace(/[\s\-\+\(\)]/g, '').toLowerCase(),
     }),
     phoneNumber({
       // Not used for OTP here (Simuni uses password login), but keeping the

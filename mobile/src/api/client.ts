@@ -69,13 +69,14 @@ export const api = {
         ? window.location.origin
         : 'http://localhost:8082';
 
+      const cleanPhone = (phone || '').replace(/[\s\-\+\(\)]/g, '');
       const res = await fetch(`${API_BASE_URL}/auth/sign-in/username`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Origin': origin,
         },
-        body: JSON.stringify({ username: phone, password }),
+        body: JSON.stringify({ username: cleanPhone, password }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

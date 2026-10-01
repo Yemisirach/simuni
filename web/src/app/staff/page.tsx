@@ -45,9 +45,10 @@ export default function StaffPage() {
     setSubmitting(true);
     setFormError(null);
     try {
+      const cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '');
       await fetchApi('/users', {
         method: 'POST',
-        body: JSON.stringify({ name, phone: phone.trim(), password, role }),
+        body: JSON.stringify({ name, phone: cleanPhone, password, role }),
       });
       setIsModalOpen(false);
       setName('');
