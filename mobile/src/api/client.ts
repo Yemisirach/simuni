@@ -207,6 +207,13 @@ export const api = {
 
   dailySalesReport: (date?: string) =>
     rawRequest(`/reports/daily-sales${date ? `?date=${encodeURIComponent(date)}` : ''}`),
+  saveInventorySnapshot: (data: any) =>
+    rawRequest('/reports/daily-sales/inventory-snapshot', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  previousDailySalesReport: (date?: string) =>
+    rawRequest(`/reports/daily-sales/previous${date ? `?date=${encodeURIComponent(date)}` : ''}`),
 };
 
 export const fetchApi = rawRequest;

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -99,7 +99,7 @@ function MainTabNavigator() {
       <Tab.Screen name="Customers" component={CustomersStackNavigator} />
       <Tab.Screen name="Survey" component={FieldSurveyScreen} />
       <Tab.Screen name="Invoices" component={InvoiceListScreen} />
-      <Tab.Screen name="Ingest" component={IngestScreen} />
+      <Tab.Screen name="Ingest" component={IngestScreen} options={{ tabBarLabel: 'Daily Sales' }} />
       <Tab.Screen name="Hub" component={HubScreen} />
       <Tab.Screen name="Factory" component={FactoryOrdersScreen} />
     </Tab.Navigator>
