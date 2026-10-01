@@ -84,12 +84,12 @@ export default function IngestScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  // Inventory adjustment / previous report modal state
+  // Inventory adjustment / modal state
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalMode, setModalMode] = useState<'previousReport' | 'quickEdit'>('previousReport');
+  const [modalMode, setModalMode] = useState<'recordSales' | 'quickEdit' | 'pullYesterday'>('recordSales');
   const [selectedVariant, setSelectedVariant] = useState<DailySalesVariant | null>(null);
 
-  // Inputs for modal
+  // Modal input state
   const [modalDate, setModalDate] = useState(shiftDate(todayKey(), -1));
   const [modalVariantInputs, setModalVariantInputs] = useState<Record<string, {
     openingStock: string;
@@ -99,8 +99,7 @@ export default function IngestScreen() {
   }>>({});
   const [modalNotes, setModalNotes] = useState('');
   const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
-
-  const isToday = useMemo(() => date === todayKey(), [date]);
+  const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
     loadReport(date);
@@ -113,6 +112,7 @@ export default function IngestScreen() {
       setError('');
       const data = await api.dailySalesReport(targetDate);
       setReport(data);
+      setIsLocked(!!data?.hasSnapshot);
 
       if (data?.variants) {
         const initInputs: Record<string, any> = {};
@@ -134,11 +134,10 @@ export default function IngestScreen() {
     }
   }
 
-  // Clean computed variants using live DB pricing with the 2 ETB discount
+  // Live DB Pricing with the 2 ETB selling discount (250/300 ETB, +30 ETB unit margin)
   const variants = useMemo(() => {
     if (!report?.variants) return [];
     return report.variants.map((v) => {
-      // Selling price and factory price directly from database
       const sellingPrice = Number(v.sellingPrice) || 250;
       const factoryPrice = Number(v.factoryPrice) || 220;
       const packQty = Number(v.packQty) || 0;
@@ -146,7 +145,7 @@ export default function IngestScreen() {
       const costAmount = packQty * factoryPrice;
       const marginAmount = salesAmount - costAmount;
       const marginPercent = salesAmount > 0 ? (marginAmount / salesAmount) * 100 : 0;
-      const unitMargin = sellingPrice - factoryPrice; // e.g. 250 - 220 = 30 ETB, or 300 - 270 = 30 ETB
+      const unitMargin = sellingPrice - factoryPrice; // 30 ETB
       const packSize = getPackSize(v.variant || v.sku || '');
 
       return {
@@ -179,10 +178,10 @@ export default function IngestScreen() {
     );
   }, [variants]);
 
-  // Open modal to add or adjust previous sales report
-  const openPreviousReportModal = () => {
-    setModalMode('previousReport');
-    setModalDate(shiftDate(date, -1));
+  // Open modal to record sales or reconcile all
+  const openReconcileModal = () => {
+    setModalMode('recordSales');
+    setModalDate(date);
     if (report?.variants) {
       const init: Record<string, any> = {};
       for (const v of report.variants) {
@@ -214,7 +213,7 @@ export default function IngestScreen() {
     setModalVisible(true);
   };
 
-  // Input change inside modal:
+  // Modal Input Change:
   // ClosingStock = Opening + Inflow - Sold
   // OR if Physical Count entered: Sold = Opening + Inflow - Physical Count
   const handleModalInputChange = (
@@ -245,7 +244,7 @@ export default function IngestScreen() {
   const handleSaveSnapshot = async () => {
     try {
       setIsSavingSnapshot(true);
-      const targetDate = modalMode === 'previousReport' ? modalDate : date;
+      const targetDate = modalDate || date;
 
       const variantsPayload = variants.map((v) => {
         const inp = modalVariantInputs[v.productId] || {
@@ -273,10 +272,11 @@ export default function IngestScreen() {
       });
 
       Alert.alert(
-        'Inventory Saved',
-        `Sales & inventory report for ${targetDate} saved successfully. Inventory updated in database.`,
+        'Ledger Updated',
+        `Sales & stock ledger for ${targetDate} verified and saved. Database inventory updated.`,
       );
       setModalVisible(false);
+      setIsLocked(true);
       loadReport(date, true);
     } catch (err: any) {
       Alert.alert('Save Failed', err?.message || 'Could not save inventory report.');
@@ -304,8 +304,8 @@ export default function IngestScreen() {
         }
         setModalVariantInputs(newInputs);
         Alert.alert(
-          'Previous Stock Loaded',
-          `Loaded report from ${yesterday}. Yesterday's ending inventory is now set as opening stock.`,
+          'Yesterday Stock Loaded',
+          `Closing stock from ${yesterday} successfully pulled as opening stock.`,
         );
       } else {
         Alert.alert('Notice', `No previous report recorded for ${yesterday}. You can enter values manually.`);
@@ -317,363 +317,457 @@ export default function IngestScreen() {
     }
   };
 
+  const recordId = useMemo(() => {
+    const clean = date.replace(/-/g, '');
+    return `#REC-${clean.slice(2, 6)}`;
+  }, [date]);
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadReport(date, true)} />}
     >
-      {/* 1. Header Bar */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <View style={styles.badgeRow}>
-            <Text style={styles.eyebrow}>ETHIOPIA B2B DISPATCH · SALES & INVENTORY</Text>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>SYNCED</Text>
+      {/* 1. Top Enterprise App Bar */}
+      <View style={styles.topBar}>
+        <View style={styles.orgDropdown}>
+          <View style={styles.orgIconBox}>
+            <Text style={{ fontSize: 13 }}>🏛️</Text>
           </View>
-          <Text style={styles.title}>Daily Sales Report</Text>
-          <Text style={styles.subtitle}>Sales, factory inflow & stock calculation from database</Text>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.orgName}>Abyssinia Beverage...</Text>
+              <Text style={styles.chevronSymbol}>↕</Text>
+            </View>
+            <Text style={styles.orgSubtitle}>Inventory Reconcile</Text>
+          </View>
         </View>
-        <Pressable
-          style={[styles.todayButton, isToday && styles.todayButtonActive]}
-          onPress={() => setDate(todayKey())}
-        >
-          <Text style={[styles.todayButtonText, isToday && styles.todayButtonTextActive]}>
-            {isToday ? 'Today' : 'Go Today'}
-          </Text>
-        </Pressable>
+
+        <View style={styles.topBarRight}>
+          <View style={styles.syncBadge}>
+            <View style={styles.syncDot} />
+            <Text style={styles.syncText}>SYNCED</Text>
+          </View>
+          <Pressable style={styles.iconCircle}>
+            <Text style={{ fontSize: 14 }}>🔔</Text>
+          </Pressable>
+          <View style={styles.avatarCircle}>
+            <Text style={{ fontSize: 14, color: '#FFFFFF' }}>👤</Text>
+          </View>
+        </View>
       </View>
 
-      {/* 2. Date Navigation Bar */}
-      <View style={styles.dateBar}>
-        <Pressable style={styles.dateNavBtn} onPress={() => setDate(shiftDate(date, -1))}>
-          <Text style={styles.dateNavBtnText}>‹ Prev</Text>
+      {/* 2. Main Page Header */}
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>Daily Sales & Stock</Text>
+        <Text style={styles.pageSubtitle}>Daily ledger verified with factory dispatch manifest</Text>
+      </View>
+
+      {/* 3. Date & Navigation Controls */}
+      <View style={styles.dateBarRow}>
+        <Pressable style={styles.dateChevronBtn} onPress={() => setDate(shiftDate(date, -1))}>
+          <Text style={styles.dateChevronText}>‹</Text>
         </Pressable>
-        <View style={styles.datePill}>
-          <Text style={styles.dateLabel}>{date}</Text>
+
+        <View style={styles.dateDisplayPill}>
+          <Text style={styles.calendarIcon}>🗓️</Text>
+          <Text style={styles.dateDisplayText}>{date}</Text>
           {report?.hasSnapshot && (
-            <View style={styles.snapshotBadge}>
-              <Text style={styles.snapshotBadgeText}>SAVED</Text>
+            <View style={styles.savedBadge}>
+              <Text style={styles.savedBadgeText}>SAVED</Text>
             </View>
           )}
         </View>
-        <Pressable style={styles.dateNavBtn} onPress={() => setDate(shiftDate(date, 1))}>
-          <Text style={styles.dateNavBtnText}>Next ›</Text>
+
+        <Pressable style={styles.dateChevronBtn} onPress={() => setDate(shiftDate(date, 1))}>
+          <Text style={styles.dateChevronText}>›</Text>
         </Pressable>
       </View>
 
-      {/* 3. Action Buttons */}
-      <View style={styles.actionBar}>
-        <Pressable style={styles.primaryActionBtn} onPress={openPreviousReportModal}>
-          <Text style={styles.primaryActionBtnText}>➕ Add / Input Previous Sales Report</Text>
+      {/* 4. Action Buttons Row: [Record Sales] & [Pull Yesterday] */}
+      <View style={styles.actionRow}>
+        <Pressable style={styles.recordSalesBtn} onPress={openReconcileModal}>
+          <Text style={styles.recordSalesIcon}>⊕</Text>
+          <Text style={styles.recordSalesText}>Record Sales</Text>
         </Pressable>
-        <Pressable style={styles.secondaryActionBtn} onPress={handleLoadPreviousDayReport}>
-          <Text style={styles.secondaryActionBtnText}>⏮️ Pull Yesterday's Stock</Text>
+
+        <Pressable style={styles.pullYesterdayBtn} onPress={handleLoadPreviousDayReport}>
+          <Text style={styles.pullYesterdayIcon}>🕒</Text>
+          <Text style={styles.pullYesterdayText}>Pull Yesterday</Text>
         </Pressable>
       </View>
 
-      {/* 4. Loading / Error / Data */}
-      {loading ? (
-        <View style={styles.loadingCard}>
-          <ActivityIndicator color={brand.gold} size="large" />
-          <Text style={styles.loadingText}>Loading daily sales & inventory report...</Text>
+      {/* 5. 2x2 Clean Metric Cards Grid */}
+      <View style={styles.metricGrid}>
+        {/* Sales Revenue */}
+        <View style={styles.metricCard}>
+          <View style={styles.metricCardHeader}>
+            <Text style={styles.metricCardTitle}>SALES REVENUE</Text>
+            <Text style={styles.metricCardIcon}>💵</Text>
+          </View>
+          <View style={styles.metricValueRow}>
+            <Text style={styles.metricUnit}>ETB</Text>
+            <Text style={styles.metricLargeNumber}>
+              {Number(totals.salesAmount || 0).toLocaleString()}
+            </Text>
+          </View>
+          <Text style={styles.metricCardSub}>{totals.packQty} packs billed today</Text>
         </View>
-      ) : error ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Report unavailable</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryButton} onPress={() => loadReport(date)}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : report ? (
-        <>
-          {/* 5. Summary KPI Cards */}
-          <View style={styles.summaryGrid}>
-            <MetricCard
-              label="TOTAL SALES REVENUE"
-              value={money(totals.salesAmount)}
-              sub={`${totals.packQty} packs sold`}
-            />
-            <MetricCard
-              label="GROSS MARGIN (+30 ETB/PK)"
-              value={money(totals.marginAmount)}
-              sub={`${totals.salesAmount > 0 ? ((totals.marginAmount / totals.salesAmount) * 100).toFixed(1) : 0}% net margin`}
-              tone="gold"
-            />
-            <MetricCard
-              label="FACTORY COGS"
-              value={money(totals.costAmount)}
-              sub="Factory buy price from DB"
-            />
-            <MetricCard
-              label="REMAINING INVENTORY"
-              value={`${totals.remainingPack} packs`}
-              sub={`Opening: ${totals.openingStock} | Inflow: +${totals.factoryReceived}`}
-              tone="stock"
-            />
-          </View>
 
-          {/* 6. Clean Inventory Flow Banner */}
-          <View style={styles.formulaBanner}>
-            <Text style={styles.formulaTitle}>INVENTORY ACCOUNTING FLOW</Text>
-            <View style={styles.formulaRow}>
-              <View style={styles.formulaStep}>
-                <Text style={styles.formulaLabel}>Opening Stock</Text>
-                <Text style={styles.formulaValue}>{totals.openingStock} pk</Text>
-              </View>
-              <Text style={styles.formulaOp}>+</Text>
-              <View style={styles.formulaStep}>
-                <Text style={styles.formulaLabel}>Factory Inflow</Text>
-                <Text style={styles.formulaValue}>+{totals.factoryReceived} pk</Text>
-              </View>
-              <Text style={styles.formulaOp}>-</Text>
-              <View style={styles.formulaStep}>
-                <Text style={styles.formulaLabel}>Sold Qty</Text>
-                <Text style={[styles.formulaValue, { color: '#B91C1C' }]}>-{totals.packQty} pk</Text>
-              </View>
-              <Text style={styles.formulaOp}>=</Text>
-              <View style={[styles.formulaStep, styles.formulaStepActive]}>
-                <Text style={styles.formulaLabelActive}>Closing Stock</Text>
-                <Text style={styles.formulaValueActive}>{totals.remainingPack} pk</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* 7. Source Breakdown Cards */}
-          <View style={styles.sourceRow}>
-            <SourceCard
-              title="Manual Agent Orders"
-              orders={report.sources.manual.orders}
-              packQty={report.sources.manual.packQty}
-              salesAmount={report.sources.manual.salesAmount}
-              marginAmount={report.sources.manual.marginAmount}
-            />
-            <SourceCard
-              title="Auto Telegram Orders"
-              orders={report.sources.auto.orders}
-              packQty={report.sources.auto.packQty}
-              salesAmount={report.sources.auto.salesAmount}
-              marginAmount={report.sources.auto.marginAmount}
-            />
-          </View>
-
-          {/* 8. Variant Inventory & Sales Table Header */}
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Variant Sales & Stock Summary</Text>
-              <Text style={styles.sectionSubtitle}>
-                Live prices from database with 2 ETB discount (250 / 300 ETB, +30 ETB margin)
+        {/* Gross Margin */}
+        <View style={styles.metricCard}>
+          <View style={styles.metricCardHeader}>
+            <Text style={styles.metricCardTitle}>GROSS MARGIN</Text>
+            <View style={styles.trendBadge}>
+              <Text style={styles.trendText}>
+                ↗{totals.salesAmount > 0 ? ((totals.marginAmount / totals.salesAmount) * 100).toFixed(1) : 0}%
               </Text>
             </View>
-            <Pressable style={styles.reconcileBtn} onPress={openPreviousReportModal}>
-              <Text style={styles.reconcileBtnText}>Reconcile</Text>
-            </Pressable>
+          </View>
+          <View style={styles.metricValueRow}>
+            <Text style={styles.metricUnit}>ETB</Text>
+            <Text style={styles.metricLargeNumber}>
+              {Number(totals.marginAmount || 0).toLocaleString()}
+            </Text>
+          </View>
+          <Text style={styles.metricCardSub}>Avg +30 ETB/pk</Text>
+        </View>
+
+        {/* Factory COGS */}
+        <View style={styles.metricCard}>
+          <View style={styles.metricCardHeader}>
+            <Text style={styles.metricCardTitle}>FACTORY COGS</Text>
+            <Text style={styles.metricCardIcon}>📊</Text>
+          </View>
+          <View style={styles.metricValueRow}>
+            <Text style={styles.metricUnit}>ETB</Text>
+            <Text style={styles.metricLargeNumber}>
+              {Number(totals.costAmount || 0).toLocaleString()}
+            </Text>
+          </View>
+          <Text style={styles.metricCardSub}>Direct purchase baseline</Text>
+        </View>
+
+        {/* Warehouse Stock (Warm Sand card) */}
+        <View style={[styles.metricCard, styles.warehouseStockCard]}>
+          <View style={styles.metricCardHeader}>
+            <Text style={styles.metricCardTitle}>WAREHOUSE STOCK</Text>
+            <Text style={styles.metricCardIcon}>📦</Text>
+          </View>
+          <View style={styles.metricValueRow}>
+            <Text style={styles.metricLargeNumber}>{totals.remainingPack}</Text>
+            <Text style={[styles.metricUnit, { marginLeft: 4, alignSelf: 'flex-end', marginBottom: 2 }]}>
+              PACKS
+            </Text>
+          </View>
+          <Text style={styles.metricCardSub}>
+            {totals.openingStock} init + {totals.factoryReceived} in
+          </Text>
+        </View>
+      </View>
+
+      {/* 6. Reconciliation Equilibrium Banner */}
+      <View style={styles.equilibriumCard}>
+        <View style={styles.equilibriumHeader}>
+          <Text style={styles.equilibriumTitle}>RECONCILIATION EQUILIBRIUM</Text>
+          <Text style={{ fontSize: 13 }}>⚖️</Text>
+        </View>
+        <View style={styles.equilibriumRow}>
+          <View style={styles.eqCol}>
+            <Text style={styles.eqLabel}>OPEN</Text>
+            <Text style={styles.eqValue}>{totals.openingStock}</Text>
           </View>
 
-          {/* 9. Product Variant Cards */}
-          {variants.map((v) => (
-            <View key={v.productId} style={styles.variantCard}>
-              <View style={styles.variantTop}>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.variantTitleRow}>
-                    <Text style={styles.variantName}>{v.variant}</Text>
-                    <View style={styles.variantSkuBadge}>
-                      <Text style={styles.variantSkuText}>{v.packSize} bottles/pack</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.pricingSub}>
-                    Sell: <Text style={styles.boldDark}>{v.sellingPrice} ETB</Text> · Buy: <Text style={styles.boldDark}>{v.factoryPrice} ETB</Text> · Unit Margin: <Text style={styles.marginText}>+{v.unitMargin} ETB</Text>
-                  </Text>
-                </View>
+          <Text style={styles.eqOp}>+</Text>
 
-                <Pressable style={styles.quickEditBtn} onPress={() => openQuickEdit(v)}>
-                  <Text style={styles.quickEditBtnText}>✏️ Edit Count</Text>
+          <View style={styles.eqCol}>
+            <Text style={styles.eqLabel}>INFLOW</Text>
+            <Text style={[styles.eqValue, { color: '#16A34A' }]}>+{totals.factoryReceived}</Text>
+          </View>
+
+          <Text style={styles.eqOp}>-</Text>
+
+          <View style={styles.eqCol}>
+            <Text style={styles.eqLabel}>SOLD</Text>
+            <Text style={[styles.eqValue, { color: '#DC2626' }]}>-{totals.packQty}</Text>
+          </View>
+
+          <Text style={styles.eqOp}>=</Text>
+
+          <View style={styles.eqCloseBox}>
+            <Text style={styles.eqCloseLabel}>CLOSE</Text>
+            <Text style={styles.eqCloseValue}>{totals.remainingPack}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 7. Sales Channels Section */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionHeading}>Sales Channels</Text>
+        <Text style={styles.sectionMetaRight}>{report?.summary?.orders || 0} orders verified</Text>
+      </View>
+
+      <View style={styles.channelsRow}>
+        {/* Manual Agents Card */}
+        <View style={styles.channelCard}>
+          <View style={styles.channelTitleRow}>
+            <Text style={{ fontSize: 13 }}>💼</Text>
+            <Text style={styles.channelTitle}>Manual Agents</Text>
+          </View>
+          <View style={styles.channelStatLine}>
+            <Text style={styles.channelStatLabel}>Billed Orders:</Text>
+            <Text style={styles.channelStatValue}>{report?.sources?.manual?.orders || 0}</Text>
+          </View>
+          <View style={styles.channelStatLine}>
+            <Text style={styles.channelStatLabel}>Volume Sold:</Text>
+            <Text style={styles.channelStatValue}>{report?.sources?.manual?.packQty || 0} pk</Text>
+          </View>
+          <View style={[styles.channelStatLine, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+            <Text style={styles.channelStatLabel}>Gross Total:</Text>
+            <Text style={styles.channelStatBold}>{money(report?.sources?.manual?.salesAmount || 0)}</Text>
+          </View>
+        </View>
+
+        {/* Telegram Bot Card */}
+        <View style={styles.channelCard}>
+          <View style={styles.channelTitleRow}>
+            <Text style={{ fontSize: 13 }}>🤖</Text>
+            <Text style={styles.channelTitle}>Telegram Bot</Text>
+          </View>
+          <View style={styles.channelStatLine}>
+            <Text style={styles.channelStatLabel}>Billed Orders:</Text>
+            <Text style={styles.channelStatValue}>{report?.sources?.auto?.orders || 0}</Text>
+          </View>
+          <View style={styles.channelStatLine}>
+            <Text style={styles.channelStatLabel}>Volume Sold:</Text>
+            <Text style={styles.channelStatValue}>{report?.sources?.auto?.packQty || 0} pk</Text>
+          </View>
+          <View style={[styles.channelStatLine, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+            <Text style={styles.channelStatLabel}>Gross Total:</Text>
+            <Text style={styles.channelStatBold}>{money(report?.sources?.auto?.salesAmount || 0)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 8. Variant Stock & Margins Section */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionHeading}>Variant Stock & Margins</Text>
+        <Pressable style={styles.reconcileAllPill} onPress={openReconcileModal}>
+          <Text style={{ fontSize: 11, marginRight: 3 }}>🎚️</Text>
+          <Text style={styles.reconcileAllText}>Reconcile All</Text>
+        </Pressable>
+      </View>
+
+      {/* Variant Cards */}
+      {loading ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={brand.black} />
+          <Text style={styles.loadingText}>Loading variants ledger...</Text>
+        </View>
+      ) : (
+        variants.map((v) => {
+          const hasSold = v.packQty > 0;
+          return (
+            <View key={v.productId} style={styles.variantItemCard}>
+              {/* Variant Header Row */}
+              <View style={styles.variantHeaderRow}>
+                <Text style={styles.variantItemName}>{v.variant}</Text>
+                <Pressable style={styles.editPillBtn} onPress={() => openQuickEdit(v)}>
+                  <Text style={{ fontSize: 11, marginRight: 2 }}>✏️</Text>
+                  <Text style={styles.editPillText}>Edit</Text>
                 </Pressable>
               </View>
 
-              {/* Stock Flow Bar */}
-              <View style={styles.flowBar}>
-                <View style={styles.flowItem}>
-                  <Text style={styles.flowLabel}>OPENING</Text>
-                  <Text style={styles.flowVal}>{v.openingStock}</Text>
-                </View>
-                <Text style={styles.flowSym}>+</Text>
-                <View style={styles.flowItem}>
-                  <Text style={styles.flowLabel}>FACTORY</Text>
-                  <Text style={styles.flowVal}>+{v.factoryReceived}</Text>
-                </View>
-                <Text style={styles.flowSym}>-</Text>
-                <View style={styles.flowItem}>
-                  <Text style={styles.flowLabel}>SOLD</Text>
-                  <Text style={[styles.flowVal, { color: '#B91C1C' }]}>-{v.packQty}</Text>
-                </View>
-                <Text style={styles.flowSym}>=</Text>
-                <View style={[styles.flowItem, styles.flowItemHighlight]}>
-                  <Text style={styles.flowLabelHighlight}>REMAINING</Text>
-                  <Text style={styles.flowValHighlight}>{v.remainingPack} pk</Text>
-                </View>
-              </View>
+              {/* Pricing Subtext */}
+              <Text style={styles.variantPricingSub}>
+                Sell {v.sellingPrice} ETB · Buy {v.factoryPrice} ETB · Margin +{v.unitMargin} ETB
+              </Text>
 
-              {/* Financials Row */}
-              <View style={styles.variantFinRow}>
-                <View style={styles.finCol}>
-                  <Text style={styles.finLabel}>TOTAL SALES</Text>
-                  <Text style={styles.finVal}>{money(v.salesAmount)}</Text>
+              {/* Stock Equation Flow Pill */}
+              <View style={styles.variantFlowContainer}>
+                <View style={styles.vFlowCol}>
+                  <Text style={styles.vFlowLabel}>OPEN</Text>
+                  <Text style={styles.vFlowValue}>{v.openingStock}</Text>
                 </View>
-                <View style={styles.finCol}>
-                  <Text style={styles.finLabel}>FACTORY COST</Text>
-                  <Text style={styles.finVal}>{money(v.costAmount)}</Text>
+                <Text style={styles.vFlowOp}>+</Text>
+                <View style={styles.vFlowCol}>
+                  <Text style={styles.vFlowLabel}>IN</Text>
+                  <Text style={[styles.vFlowValue, v.factoryReceived > 0 && { color: '#16A34A', fontWeight: '800' }]}>
+                    +{v.factoryReceived}
+                  </Text>
                 </View>
-                <View style={[styles.finCol, { alignItems: 'flex-end' }]}>
-                  <Text style={styles.finLabel}>GROSS MARGIN</Text>
-                  <Text style={[styles.finVal, { color: semantic.successDark, fontWeight: '900' }]}>
-                    +{money(v.marginAmount)} ({v.marginPercent}%)
+                <Text style={styles.vFlowOp}>-</Text>
+                <View style={styles.vFlowCol}>
+                  <Text style={styles.vFlowLabel}>SOLD</Text>
+                  <Text style={[styles.vFlowValue, v.packQty > 0 && { color: '#DC2626', fontWeight: '800' }]}>
+                    -{v.packQty}
+                  </Text>
+                </View>
+                <Text style={styles.vFlowOp}>=</Text>
+                <View style={styles.vFlowRemBadge}>
+                  <Text style={styles.vFlowRemText}>
+                    REM <Text style={{ fontWeight: '800' }}>{v.remainingPack}</Text> pk
                   </Text>
                 </View>
               </View>
+
+              {/* Variant Financial Summary Footer */}
+              <View style={styles.variantFinanceRow}>
+                <Text style={styles.variantFinanceText}>
+                  Sales: <Text style={styles.boldText}>{money(v.salesAmount)}</Text>
+                </Text>
+                <Text style={styles.variantFinanceText}>
+                  Cost: <Text style={styles.boldText}>{money(v.costAmount)}</Text>
+                </Text>
+                {hasSold ? (
+                  <Text style={[styles.variantFinanceText, { color: '#16A34A', fontWeight: '800' }]}>
+                    Margin: +{money(v.marginAmount)} ({v.marginPercent}%)
+                  </Text>
+                ) : (
+                  <Text style={styles.variantFinanceText}>
+                    Margin: <Text style={styles.boldText}>{money(0)}</Text>
+                  </Text>
+                )}
+              </View>
             </View>
-          ))}
+          );
+        })
+      )}
 
-          {/* 10. Save Snapshot Button */}
-          <Pressable style={styles.saveSnapshotFullBtn} onPress={openPreviousReportModal}>
-            <Text style={styles.saveSnapshotFullBtnText}>
-              💾 Save / Record Inventory Reconciliation for {date}
-            </Text>
-          </Pressable>
-        </>
-      ) : null}
+      {/* 9. Bottom Ledger Lock & Post Section */}
+      <View style={styles.ledgerLockCard}>
+        <View style={styles.ledgerLockHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Text style={{ color: '#16A34A', fontSize: 13, fontWeight: '800' }}>✓</Text>
+            <Text style={styles.ledgerStatusText}>Ledger Balanced & Ready</Text>
+          </View>
+          <Text style={styles.ledgerRecId}>RecID: {recordId}</Text>
+        </View>
 
-      {/* 11. Modal for Adding / Adjusting Previous Sales Report & Stock */}
+        <Pressable
+          style={[styles.lockButton, isSavingSnapshot && { opacity: 0.6 }]}
+          onPress={handleSaveSnapshot}
+          disabled={isSavingSnapshot}
+        >
+          {isSavingSnapshot ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 13 }}>🔒</Text>
+              <Text style={styles.lockButtonText}>Lock & Post Ledger for {date}</Text>
+            </View>
+          )}
+        </Pressable>
+
+        <Text style={styles.lockFooterNote}>
+          Locking creates an immutable record on Ethiopian Birr fiscal store.
+        </Text>
+      </View>
+
+      {/* 10. Reconcile / Stock Adjustment Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalBox}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>
-                  {modalMode === 'previousReport'
-                    ? 'Add / Input Previous Sales Report'
+                  {modalMode === 'recordSales'
+                    ? 'Record Sales & Inventory'
                     : `Stock Count: ${selectedVariant?.variant}`}
                 </Text>
                 <Text style={styles.modalSubtitle}>
-                  Formula: Sold = Opening + Factory Load - Physical Ending Count
+                  Formula: Sold = Opening + Factory Inflow - Physical Count
                 </Text>
               </View>
-              <Pressable onPress={() => setModalVisible(false)} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>✕</Text>
+              <Pressable onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={{ fontSize: 18, color: '#6B7280' }}>✕</Text>
               </Pressable>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
-              {modalMode === 'previousReport' && (
-                <View style={styles.modalDateRow}>
-                  <Text style={styles.modalDateLabel}>REPORT DATE (YYYY-MM-DD):</Text>
-                  <TextInput
-                    style={styles.modalDateInput}
-                    value={modalDate}
-                    onChangeText={setModalDate}
-                    placeholder="YYYY-MM-DD"
-                  />
-                  <Pressable
-                    style={styles.yesterdayBtn}
-                    onPress={() => setModalDate(shiftDate(date, -1))}
-                  >
-                    <Text style={styles.yesterdayBtnText}>Set Yesterday</Text>
-                  </Pressable>
-                </View>
-              )}
+            <ScrollView style={styles.modalBody}>
+              {(modalMode === 'recordSales' ? variants : (selectedVariant ? [selectedVariant] : [])).map((v) => {
+                const input = modalVariantInputs[v.productId] || {
+                  openingStock: String(v.openingStock),
+                  factoryReceived: String(v.factoryReceived),
+                  soldQty: String(v.packQty),
+                  closingStock: String(v.remainingPack),
+                };
 
-              {/* Items in modal */}
-              {(modalMode === 'previousReport' ? variants : (selectedVariant ? [selectedVariant] : [])).map(
-                (v) => {
-                  const input = modalVariantInputs[v.productId] || {
-                    openingStock: String(v.openingStock),
-                    factoryReceived: String(v.factoryReceived),
-                    soldQty: String(v.packQty),
-                    closingStock: String(v.remainingPack),
-                  };
+                const calculatedSold = Number(input.soldQty) || 0;
+                const calcSales = calculatedSold * v.sellingPrice;
+                const calcMargin = calculatedSold * v.unitMargin;
 
-                  const calculatedSold = Number(input.soldQty) || 0;
-                  const calcSales = calculatedSold * v.sellingPrice;
-                  const calcMargin = calculatedSold * v.unitMargin;
+                return (
+                  <View key={v.productId} style={styles.modalVariantCard}>
+                    <View style={styles.modalVCardTop}>
+                      <Text style={styles.modalVCardTitle}>{v.variant}</Text>
+                      <Text style={styles.modalVCardPill}>
+                        Price: {v.sellingPrice} ETB · Margin: +{v.unitMargin} ETB
+                      </Text>
+                    </View>
 
-                  return (
-                    <View key={v.productId} style={styles.modalItemCard}>
-                      <View style={styles.modalItemHeader}>
-                        <Text style={styles.modalItemTitle}>{v.variant}</Text>
-                        <Text style={styles.modalItemBadge}>
-                          Price: {v.sellingPrice} ETB · Margin: +{v.unitMargin} ETB
-                        </Text>
+                    <View style={styles.modalInputGrid}>
+                      <View style={styles.mCol}>
+                        <Text style={styles.mColLabel}>Opening</Text>
+                        <TextInput
+                          style={styles.mInput}
+                          keyboardType="numeric"
+                          value={input.openingStock}
+                          onChangeText={(val) => handleModalInputChange(v.productId, 'openingStock', val)}
+                        />
                       </View>
 
-                      <View style={styles.inputGrid}>
-                        {/* Opening Stock */}
-                        <View style={styles.inputCol}>
-                          <Text style={styles.inputColLabel}>Opening Stock</Text>
-                          <TextInput
-                            style={styles.numberInput}
-                            keyboardType="numeric"
-                            value={input.openingStock}
-                            onChangeText={(val) => handleModalInputChange(v.productId, 'openingStock', val)}
-                          />
-                        </View>
-
-                        {/* Factory Inflow */}
-                        <View style={styles.inputCol}>
-                          <Text style={styles.inputColLabel}>+ Factory Load</Text>
-                          <TextInput
-                            style={styles.numberInput}
-                            keyboardType="numeric"
-                            value={input.factoryReceived}
-                            onChangeText={(val) => handleModalInputChange(v.productId, 'factoryReceived', val)}
-                          />
-                        </View>
-
-                        {/* Physical Closing Count */}
-                        <View style={styles.inputCol}>
-                          <Text style={[styles.inputColLabel, { color: brand.black, fontWeight: '800' }]}>
-                            = Physical Count
-                          </Text>
-                          <TextInput
-                            style={[styles.numberInput, styles.highlightInput]}
-                            keyboardType="numeric"
-                            value={input.closingStock}
-                            onChangeText={(val) => handleModalInputChange(v.productId, 'closingStock', val)}
-                          />
-                        </View>
-
-                        {/* Calculated Sold */}
-                        <View style={styles.inputCol}>
-                          <Text style={[styles.inputColLabel, { color: '#B91C1C' }]}>Calculated Sold</Text>
-                          <TextInput
-                            style={[styles.numberInput, styles.soldInput]}
-                            keyboardType="numeric"
-                            value={input.soldQty}
-                            onChangeText={(val) => handleModalInputChange(v.productId, 'soldQty', val)}
-                          />
-                        </View>
+                      <View style={styles.mCol}>
+                        <Text style={styles.mColLabel}>+ Factory</Text>
+                        <TextInput
+                          style={styles.mInput}
+                          keyboardType="numeric"
+                          value={input.factoryReceived}
+                          onChangeText={(val) => handleModalInputChange(v.productId, 'factoryReceived', val)}
+                        />
                       </View>
 
-                      {/* Calculations breakdown */}
-                      <View style={styles.modalCalcRow}>
-                        <Text style={styles.modalCalcText}>
-                          Sales: <Text style={{ fontWeight: '800' }}>{money(calcSales)}</Text>
+                      <View style={styles.mCol}>
+                        <Text style={[styles.mColLabel, { color: '#0F172A', fontWeight: '800' }]}>
+                          = Count
                         </Text>
-                        <Text style={[styles.modalCalcText, { color: semantic.successDark }]}>
-                          Net Margin (+30 ETB/pk): <Text style={{ fontWeight: '800' }}>+{money(calcMargin)}</Text>
-                        </Text>
+                        <TextInput
+                          style={[styles.mInput, styles.highlightMInput]}
+                          keyboardType="numeric"
+                          value={input.closingStock}
+                          onChangeText={(val) => handleModalInputChange(v.productId, 'closingStock', val)}
+                        />
+                      </View>
+
+                      <View style={styles.mCol}>
+                        <Text style={[styles.mColLabel, { color: '#DC2626' }]}>Sold Qty</Text>
+                        <TextInput
+                          style={[styles.mInput, styles.soldMInput]}
+                          keyboardType="numeric"
+                          value={input.soldQty}
+                          onChangeText={(val) => handleModalInputChange(v.productId, 'soldQty', val)}
+                        />
                       </View>
                     </View>
-                  );
-                }
-              )}
 
-              <View style={{ marginTop: spacing.md }}>
-                <Text style={styles.inputColLabel}>NOTES / RECONCILIATION REMARKS:</Text>
+                    <View style={styles.modalCalcRow}>
+                      <Text style={styles.modalCalcText}>
+                        Sales: <Text style={{ fontWeight: '700' }}>{money(calcSales)}</Text>
+                      </Text>
+                      <Text style={[styles.modalCalcText, { color: '#16A34A', fontWeight: '700' }]}>
+                        Margin: +{money(calcMargin)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.mColLabel}>REMARKS / VERIFICATION NOTE:</Text>
                 <TextInput
-                  style={[styles.numberInput, { height: 60, textAlignVertical: 'top' }]}
+                  style={[styles.mInput, { height: 56, textAlignVertical: 'top', marginTop: 4 }]}
                   multiline
-                  placeholder="e.g. Daily field route closing count verified"
+                  placeholder="e.g. End of day warehouse physical inventory count verified"
                   value={modalNotes}
                   onChangeText={setModalNotes}
                 />
@@ -682,21 +776,21 @@ export default function IngestScreen() {
 
             <View style={styles.modalFooter}>
               <Pressable
-                style={styles.cancelBtn}
+                style={styles.modalCancelBtn}
                 onPress={() => setModalVisible(false)}
                 disabled={isSavingSnapshot}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.submitBtn, isSavingSnapshot && styles.submitBtnDisabled]}
+                style={[styles.modalSubmitBtn, isSavingSnapshot && { opacity: 0.6 }]}
                 onPress={handleSaveSnapshot}
                 disabled={isSavingSnapshot}
               >
                 {isSavingSnapshot ? (
-                  <ActivityIndicator color={brand.black} size="small" />
+                  <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.submitBtnText}>💾 Save & Update Inventory</Text>
+                  <Text style={styles.modalSubmitText}>Post & Update Ledger</Text>
                 )}
               </Pressable>
             </View>
@@ -707,656 +801,666 @@ export default function IngestScreen() {
   );
 }
 
-// Subcomponents
-
-function MetricCard({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: 'gold' | 'stock';
-}) {
-  return (
-    <View
-      style={[
-        styles.metricCard,
-        tone === 'gold' && styles.metricCardGold,
-        tone === 'stock' && styles.metricCardStock,
-      ]}
-    >
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, tone === 'gold' && styles.metricValueGold]}>{value}</Text>
-      {sub && <Text style={styles.metricSub}>{sub}</Text>}
-    </View>
-  );
-}
-
-function SourceCard({
-  title,
-  orders,
-  packQty,
-  salesAmount,
-  marginAmount,
-}: {
-  title: string;
-  orders: number;
-  packQty: number;
-  salesAmount: number;
-  marginAmount: number;
-}) {
-  return (
-    <View style={styles.sourceCard}>
-      <Text style={styles.sourceTitle}>{title}</Text>
-      <View style={styles.sourceLine}>
-        <Text style={styles.sourceLabel}>Orders Count</Text>
-        <Text style={styles.sourceValue}>{orders}</Text>
-      </View>
-      <View style={styles.sourceLine}>
-        <Text style={styles.sourceLabel}>Packs Dispatched</Text>
-        <Text style={styles.sourceValue}>{packQty} pk</Text>
-      </View>
-      <View style={styles.sourceLine}>
-        <Text style={styles.sourceLabel}>Gross Sales</Text>
-        <Text style={styles.sourceValue}>{money(salesAmount)}</Text>
-      </View>
-      <View style={styles.sourceLine}>
-        <Text style={styles.sourceLabel}>Gross Margin</Text>
-        <Text style={[styles.sourceValue, { color: semantic.successDark, fontWeight: '800' }]}>
-          {money(marginAmount)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F3',
+    backgroundColor: '#F8F9FA',
   },
   content: {
-    padding: spacing.md,
-    paddingBottom: spacing['3xl'],
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 48,
   },
 
-  // Header
-  header: {
+  // 1. Top Enterprise App Bar
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingVertical: 4,
   },
-  badgeRow: {
+  orgDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: 8,
   },
-  eyebrow: {
+  orgIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F1F3F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orgName: {
     fontFamily: fontFamily.sans,
-    fontSize: 11,
-    color: '#8C702E',
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E2022',
   },
-  liveDot: {
+  chevronSymbol: {
+    fontSize: 10,
+    color: '#6B7280',
+  },
+  orgSubtitle: {
+    fontFamily: fontFamily.sans,
+    fontSize: 10,
+    color: '#8C9199',
+    marginTop: 1,
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EAF7EE',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  syncDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: semantic.success,
+    backgroundColor: '#16A34A',
   },
-  liveText: {
+  syncText: {
     fontFamily: fontFamily.sans,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    color: semantic.success,
+    color: '#16A34A',
     letterSpacing: 0.5,
   },
-  title: {
-    fontFamily: fontFamily.serif,
-    fontSize: 24,
-    fontWeight: '700',
-    color: brand.black,
-  },
-  subtitle: {
-    fontFamily: fontFamily.sans,
-    fontSize: 12,
-    color: neutral[600],
-    marginTop: 2,
-  },
-  todayButton: {
+  iconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: neutral[300],
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.md,
-    ...shadows.sm,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  todayButtonActive: {
-    backgroundColor: brand.gold,
-    borderColor: brand.gold,
-  },
-  todayButtonText: {
-    fontFamily: fontFamily.sans,
-    color: brand.black,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  todayButtonTextActive: {
-    color: brand.black,
-    fontWeight: '800',
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4B5563',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // Date Bar
-  dateBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+  // 2. Page Header
+  pageHeader: {
+    marginBottom: 14,
   },
-  dateNavBtn: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: neutral[300],
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    ...shadows.sm,
+  pageTitle: {
+    fontFamily: fontFamily.serif,
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -0.3,
   },
-  dateNavBtnText: {
+  pageSubtitle: {
     fontFamily: fontFamily.sans,
     fontSize: 12,
-    fontWeight: '700',
-    color: brand.black,
+    color: '#6B7280',
+    marginTop: 3,
   },
-  datePill: {
-    flex: 1,
+
+  // 3. Date Bar Row
+  dateBarRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: brand.black,
-    borderRadius: radius.md,
-    paddingVertical: 9,
-    paddingHorizontal: spacing.sm,
+    marginBottom: 12,
   },
-  dateLabel: {
+  dateChevronBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.sm,
+  },
+  dateChevronText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  dateDisplayPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    height: 36,
+    paddingHorizontal: 12,
+    ...shadows.sm,
+  },
+  calendarIcon: {
+    fontSize: 13,
+  },
+  dateDisplayText: {
     fontFamily: fontFamily.mono,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F2937',
   },
-  snapshotBadge: {
-    backgroundColor: brand.gold,
+  savedBadge: {
+    backgroundColor: '#EEDDBB',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  snapshotBadgeText: {
+  savedBadgeText: {
     fontFamily: fontFamily.sans,
     fontSize: 9,
-    fontWeight: '900',
-    color: brand.black,
+    fontWeight: '800',
+    color: '#7A5B18',
   },
 
-  // Action Bar
-  actionBar: {
+  // 4. Action Row: Record Sales / Pull Yesterday
+  actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: 10,
+    marginBottom: 16,
   },
-  primaryActionBtn: {
-    flex: 1.4,
-    backgroundColor: brand.gold,
-    borderRadius: radius.md,
-    paddingVertical: 10,
+  recordSalesBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#1E2024',
+    borderRadius: 10,
+    paddingVertical: 10,
     ...shadows.sm,
   },
-  primaryActionBtnText: {
-    fontFamily: fontFamily.sans,
-    fontSize: 12,
+  recordSalesIcon: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '800',
-    color: brand.black,
   },
-  secondaryActionBtn: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: neutral[300],
-    borderRadius: radius.md,
-    paddingVertical: 10,
-    alignItems: 'center',
-    ...shadows.sm,
-  },
-  secondaryActionBtnText: {
+  recordSalesText: {
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '700',
-    color: brand.black,
+    color: '#FFFFFF',
+  },
+  pullYesterdayBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 10,
+    ...shadows.sm,
+  },
+  pullYesterdayIcon: {
+    fontSize: 12,
+  },
+  pullYesterdayText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B5563',
   },
 
-  // KPI Grid
-  summaryGrid: {
+  // 5. 2x2 Metric Grid
+  metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: 10,
+    marginBottom: 14,
   },
   metricCard: {
     width: '48.5%',
     backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    padding: spacing.md,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: neutral[200],
+    borderColor: '#ECEEF1',
     ...shadows.sm,
   },
-  metricCardGold: {
-    backgroundColor: '#FDFBF4',
-    borderColor: brand.gold,
+  warehouseStockCard: {
+    backgroundColor: '#FDFBF7',
+    borderColor: '#EFE7D6',
   },
-  metricCardStock: {
-    backgroundColor: '#F6FBF7',
-    borderColor: '#C7E8D0',
+  metricCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
-  metricLabel: {
+  metricCardTitle: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
     fontWeight: '800',
-    color: neutral[500],
-    letterSpacing: 0.5,
+    color: '#6B7280',
+    letterSpacing: 0.4,
   },
-  metricValue: {
-    fontFamily: fontFamily.mono,
-    fontSize: 18,
-    fontWeight: '800',
-    color: brand.black,
-    marginTop: 4,
+  metricCardIcon: {
+    fontSize: 13,
   },
-  metricValueGold: {
-    color: '#8C702E',
+  metricValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+    marginBottom: 4,
   },
-  metricSub: {
+  metricUnit: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: neutral[600],
-    marginTop: 2,
+    fontWeight: '700',
+    color: '#6B7280',
   },
-
-  // Formula Banner
-  formulaBanner: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: neutral[200],
-    ...shadows.sm,
+  metricLargeNumber: {
+    fontFamily: fontFamily.sans,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -0.5,
   },
-  formulaTitle: {
+  metricCardSub: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    color: '#8C9199',
+  },
+  trendBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  trendText: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
     fontWeight: '800',
-    color: neutral[500],
-    letterSpacing: 0.5,
+    color: '#15803D',
+  },
+
+  // 6. Reconciliation Equilibrium Banner
+  equilibriumCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ECEEF1',
+    marginBottom: 16,
+    ...shadows.sm,
+  },
+  equilibriumHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  formulaRow: {
+  equilibriumTitle: {
+    fontFamily: fontFamily.sans,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#6B7280',
+    letterSpacing: 0.5,
+  },
+  equilibriumRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  formulaStep: {
+  eqCol: {
     alignItems: 'center',
     flex: 1,
   },
-  formulaStepActive: {
-    backgroundColor: '#FDFBF4',
-    borderWidth: 1,
-    borderColor: brand.gold,
-    borderRadius: radius.sm,
-    paddingVertical: 4,
-  },
-  formulaLabel: {
+  eqLabel: {
     fontFamily: fontFamily.sans,
     fontSize: 9,
-    color: neutral[500],
     fontWeight: '700',
+    color: '#9CA3AF',
   },
-  formulaValue: {
-    fontFamily: fontFamily.mono,
-    fontSize: 13,
-    fontWeight: '800',
-    color: brand.black,
-    marginTop: 2,
-  },
-  formulaLabelActive: {
-    fontFamily: fontFamily.sans,
-    fontSize: 9,
-    color: '#8C702E',
-    fontWeight: '800',
-  },
-  formulaValueActive: {
+  eqValue: {
     fontFamily: fontFamily.mono,
     fontSize: 14,
-    fontWeight: '900',
-    color: '#8C702E',
+    fontWeight: '800',
+    color: '#111827',
     marginTop: 2,
   },
-  formulaOp: {
+  eqOp: {
+    fontFamily: fontFamily.sans,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D1D5DB',
+  },
+  eqCloseBox: {
+    alignItems: 'center',
+    flex: 1.1,
+    backgroundColor: '#EFE7D6',
+    borderRadius: 6,
+    paddingVertical: 4,
+  },
+  eqCloseLabel: {
+    fontFamily: fontFamily.sans,
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#7A5B18',
+  },
+  eqCloseValue: {
     fontFamily: fontFamily.mono,
     fontSize: 15,
     fontWeight: '900',
-    color: neutral[400],
-    marginHorizontal: 2,
+    color: '#7A5B18',
+    marginTop: 1,
   },
 
-  // Sources Row
-  sourceRow: {
+  // 7. Section Header & Sales Channels
+  sectionHeaderRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 4,
   },
-  sourceCard: {
+  sectionHeading: {
+    fontFamily: fontFamily.sans,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  sectionMetaRight: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    color: '#8C9199',
+  },
+  channelsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  channelCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    padding: spacing.md,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: neutral[200],
+    borderColor: '#ECEEF1',
     ...shadows.sm,
   },
-  sourceTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 13,
-    fontWeight: '700',
-    color: brand.black,
-    marginBottom: 6,
+  channelTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
   },
-  sourceLine: {
+  channelTitle: {
+    fontFamily: fontFamily.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  channelStatLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 3,
   },
-  sourceLabel: {
+  channelStatLabel: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: neutral[600],
+    color: '#6B7280',
   },
-  sourceValue: {
+  channelStatValue: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  channelStatBold: {
     fontFamily: fontFamily.mono,
     fontSize: 11,
-    color: brand.black,
-    fontWeight: '700',
-  },
-
-  // Section Headers
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 16,
-    fontWeight: '700',
-    color: brand.black,
-  },
-  sectionSubtitle: {
-    fontFamily: fontFamily.sans,
-    fontSize: 11,
-    color: neutral[500],
-    marginTop: 2,
-  },
-  reconcileBtn: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: brand.gold,
-    borderRadius: radius.sm,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  reconcileBtnText: {
-    fontFamily: fontFamily.sans,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#8C702E',
-  },
-
-  // Variant Card
-  variantCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: neutral[200],
-    ...shadows.sm,
-  },
-  variantTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.sm,
-  },
-  variantTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  variantName: {
-    fontFamily: fontFamily.serif,
-    fontSize: 16,
-    fontWeight: '700',
-    color: brand.black,
-  },
-  variantSkuBadge: {
-    backgroundColor: neutral[100],
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  variantSkuText: {
-    fontFamily: fontFamily.sans,
-    fontSize: 10,
-    fontWeight: '700',
-    color: neutral[600],
-  },
-  pricingSub: {
-    fontFamily: fontFamily.sans,
-    fontSize: 11,
-    color: neutral[600],
-    marginTop: 3,
-  },
-  boldDark: {
-    fontFamily: fontFamily.mono,
-    fontWeight: '700',
-    color: brand.black,
-  },
-  marginText: {
-    fontFamily: fontFamily.mono,
-    color: semantic.successDark,
     fontWeight: '800',
+    color: '#111827',
   },
-  quickEditBtn: {
-    backgroundColor: '#FDFBF4',
-    borderWidth: 1,
-    borderColor: brand.gold,
-    borderRadius: radius.sm,
-    paddingVertical: 4,
+
+  // 8. Variant Stock & Margins Section
+  reconcileAllPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EAE2D2',
     paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  quickEditBtnText: {
+  reconcileAllText: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
     fontWeight: '700',
-    color: brand.black,
+    color: '#6E5316',
   },
-
-  // Flow Bar
-  flowBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: neutral[50],
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: neutral[200],
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    marginBottom: spacing.sm,
-  },
-  flowItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  flowItemHighlight: {
+  variantItemCard: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: brand.gold,
-    borderRadius: 4,
-    paddingVertical: 2,
+    borderColor: '#ECEEF1',
+    marginBottom: 10,
+    ...shadows.sm,
   },
-  flowLabel: {
-    fontFamily: fontFamily.sans,
-    fontSize: 8,
-    fontWeight: '800',
-    color: neutral[500],
-  },
-  flowVal: {
-    fontFamily: fontFamily.mono,
-    fontSize: 13,
-    fontWeight: '800',
-    color: brand.black,
-    marginTop: 1,
-  },
-  flowLabelHighlight: {
-    fontFamily: fontFamily.sans,
-    fontSize: 8,
-    fontWeight: '900',
-    color: '#8C702E',
-  },
-  flowValHighlight: {
-    fontFamily: fontFamily.mono,
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#8C702E',
-    marginTop: 1,
-  },
-  flowSym: {
-    fontFamily: fontFamily.mono,
-    fontSize: 14,
-    fontWeight: '800',
-    color: neutral[400],
-  },
-
-  // Financials Row
-  variantFinRow: {
+  variantHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: neutral[150],
-    paddingTop: 8,
+    alignItems: 'center',
   },
-  finCol: {
+  variantItemName: {
+    fontFamily: fontFamily.sans,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  editPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  editPillText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  variantPricingSub: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  variantFlowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  vFlowCol: {
+    alignItems: 'center',
     flex: 1,
   },
-  finLabel: {
+  vFlowLabel: {
     fontFamily: fontFamily.sans,
-    fontSize: 9,
-    fontWeight: '800',
-    color: neutral[500],
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#9CA3AF',
   },
-  finVal: {
+  vFlowValue: {
     fontFamily: fontFamily.mono,
     fontSize: 12,
-    fontWeight: '800',
-    color: brand.black,
-    marginTop: 2,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 1,
   },
-
-  // Bottom Save Button
-  saveSnapshotFullBtn: {
-    backgroundColor: brand.gold,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: spacing.md,
-    ...shadows.sm,
-  },
-  saveSnapshotFullBtnText: {
+  vFlowOp: {
     fontFamily: fontFamily.sans,
-    fontSize: 14,
-    fontWeight: '800',
-    color: brand.black,
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  vFlowRemBadge: {
+    backgroundColor: '#EAE2D2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
+  vFlowRemText: {
+    fontFamily: fontFamily.mono,
+    fontSize: 11,
+    color: '#6E5316',
+  },
+  variantFinanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  variantFinanceText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  boldText: {
+    fontFamily: fontFamily.mono,
+    fontWeight: '700',
+    color: '#111827',
   },
 
-  // Loading & Error
-  loadingCard: {
-    alignItems: 'center',
+  // 9. Bottom Ledger Lock Card
+  ledgerLockCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    padding: spacing.xl,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#ECEEF1',
+    marginTop: 8,
+    marginBottom: 20,
     ...shadows.sm,
   },
-  loadingText: {
-    marginTop: spacing.sm,
-    color: neutral[600],
+  ledgerLockHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  ledgerStatusText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  ledgerRecId: {
+    fontFamily: fontFamily.mono,
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  lockButton: {
+    backgroundColor: '#23272E',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  lockButtonText: {
     fontFamily: fontFamily.sans,
     fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  lockFooterNote: {
+    fontFamily: fontFamily.sans,
+    fontSize: 10,
+    color: '#8C9199',
+    textAlign: 'center',
+  },
+
+  // Loading
+  loadingBox: {
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontFamily: fontFamily.sans,
+    fontSize: 12,
+    color: '#6B7280',
   },
   errorCard: {
     backgroundColor: '#FEF2F2',
-    borderRadius: radius.md,
-    padding: spacing.md,
+    borderRadius: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#FECACA',
+    marginBottom: 12,
   },
   errorTitle: {
     color: '#991B1B',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
   },
   errorText: {
     color: '#7F1D1D',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 2,
   },
   retryButton: {
     alignSelf: 'flex-start',
     backgroundColor: '#991B1B',
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginTop: spacing.sm,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 6,
   },
   retryButtonText: {
     color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 12,
+    fontWeight: '700',
+    fontSize: 11,
   },
 
-  // Modal
+  // 10. Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: spacing.md,
+    padding: 16,
   },
-  modalContent: {
+  modalBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: radius.lg,
-    maxHeight: '90%',
-    padding: spacing.lg,
+    borderRadius: 16,
+    maxHeight: '88%',
+    padding: 16,
     ...shadows.lg,
   },
   modalHeader: {
@@ -1364,124 +1468,85 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     borderBottomWidth: 1,
-    borderBottomColor: neutral[200],
-    paddingBottom: spacing.sm,
-    marginBottom: spacing.sm,
+    borderBottomColor: '#F3F4F6',
+    paddingBottom: 10,
+    marginBottom: 10,
   },
   modalTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 17,
-    fontWeight: '700',
-    color: brand.black,
+    fontFamily: fontFamily.sans,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
   },
   modalSubtitle: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
-    color: neutral[500],
+    color: '#6B7280',
     marginTop: 2,
   },
-  closeBtn: {
+  modalCloseBtn: {
     padding: 4,
   },
-  closeBtnText: {
-    fontSize: 18,
-    color: neutral[500],
-    fontWeight: '700',
+  modalBody: {
+    maxHeight: 420,
   },
-  modalScroll: {
-    maxHeight: 440,
-  },
-  modalDateRow: {
-    backgroundColor: neutral[100],
-    borderRadius: radius.sm,
-    padding: 10,
-    marginBottom: spacing.sm,
-  },
-  modalDateLabel: {
-    fontFamily: fontFamily.sans,
-    fontSize: 10,
-    fontWeight: '800',
-    color: neutral[600],
-    marginBottom: 4,
-  },
-  modalDateInput: {
-    backgroundColor: '#FFFFFF',
+  modalVariantCard: {
     borderWidth: 1,
-    borderColor: neutral[300],
-    borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontFamily: fontFamily.mono,
-    fontSize: 13,
-    color: brand.black,
-  },
-  yesterdayBtn: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
-  },
-  yesterdayBtnText: {
-    fontFamily: fontFamily.sans,
-    fontSize: 11,
-    color: '#8C702E',
-    fontWeight: '700',
-  },
-  modalItemCard: {
-    borderWidth: 1,
-    borderColor: neutral[200],
-    borderRadius: radius.sm,
+    borderColor: '#ECEEF1',
+    borderRadius: 10,
     padding: 10,
     marginBottom: 8,
-    backgroundColor: neutral[50],
+    backgroundColor: '#F9FAFB',
   },
-  modalItemHeader: {
+  modalVCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  modalItemTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 14,
-    fontWeight: '700',
-    color: brand.black,
+  modalVCardTitle: {
+    fontFamily: fontFamily.sans,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#111827',
   },
-  modalItemBadge: {
+  modalVCardPill: {
     fontFamily: fontFamily.sans,
     fontSize: 10,
-    color: neutral[600],
+    color: '#6B7280',
   },
-  inputGrid: {
+  modalInputGrid: {
     flexDirection: 'row',
     gap: 6,
   },
-  inputCol: {
+  mCol: {
     flex: 1,
   },
-  inputColLabel: {
+  mColLabel: {
     fontFamily: fontFamily.sans,
     fontSize: 9,
     fontWeight: '700',
-    color: neutral[600],
+    color: '#6B7280',
     marginBottom: 3,
   },
-  numberInput: {
+  mInput: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: neutral[300],
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
     fontFamily: fontFamily.mono,
     fontSize: 13,
-    color: brand.black,
+    color: '#111827',
     textAlign: 'center',
   },
-  highlightInput: {
-    borderColor: brand.gold,
+  highlightMInput: {
+    borderColor: '#C4A35A',
     backgroundColor: '#FDFBF4',
     fontWeight: '800',
   },
-  soldInput: {
+  soldMInput: {
     borderColor: '#F87171',
     backgroundColor: '#FEF2F2',
     color: '#B91C1C',
@@ -1493,48 +1558,45 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: neutral[200],
+    borderTopColor: '#E5E7EB',
   },
   modalCalcText: {
     fontFamily: fontFamily.mono,
     fontSize: 11,
-    color: brand.black,
+    color: '#374151',
   },
   modalFooter: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.md,
-    paddingTop: spacing.sm,
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: neutral[200],
+    borderTopColor: '#F3F4F6',
   },
-  cancelBtn: {
+  modalCancelBtn: {
     flex: 1,
-    backgroundColor: neutral[100],
-    borderRadius: radius.md,
-    paddingVertical: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  cancelBtnText: {
+  modalCancelText: {
     fontFamily: fontFamily.sans,
-    fontSize: 13,
-    fontWeight: '700',
-    color: neutral[700],
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B5563',
   },
-  submitBtn: {
+  modalSubmitBtn: {
     flex: 2,
-    backgroundColor: brand.gold,
-    borderRadius: radius.md,
-    paddingVertical: 12,
+    backgroundColor: '#1E2024',
+    borderRadius: 8,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  submitBtnDisabled: {
-    opacity: 0.5,
-  },
-  submitBtnText: {
+  modalSubmitText: {
     fontFamily: fontFamily.sans,
-    fontSize: 13,
-    fontWeight: '800',
-    color: brand.black,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
