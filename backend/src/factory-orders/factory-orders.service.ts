@@ -66,10 +66,14 @@ export class FactoryOrdersService {
         data: { factoryBalance: newBalance }
       });
 
+      const orderDate = data.date ? new Date(data.date) : new Date();
+
       const order = await tx.factoryOrder.create({
         data: {
           workspaceId: wsId,
           totalBudget,
+          date: orderDate,
+          createdAt: orderDate,
           items: {
             create: data.items.map(item => ({
               productId: item.productId,
@@ -101,7 +105,8 @@ export class FactoryOrdersService {
           type: 'ORDER_DEDUCTION',
           amount: totalBudget,
           balanceAfter: newBalance,
-          referenceId: order.id
+          referenceId: order.id,
+          date: orderDate,
         }
       });
       
@@ -116,7 +121,7 @@ export class FactoryOrdersService {
       include: {
         items: { include: { product: true } }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { date: 'desc' }
     });
   }
 

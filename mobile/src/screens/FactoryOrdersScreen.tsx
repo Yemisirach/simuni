@@ -68,6 +68,7 @@ export default function FactoryOrdersScreen() {
   const [showPriceReference, setShowPriceReference] = useState(true);
 
   // Form State
+  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState('10');
   const [buyPrice, setBuyPrice] = useState('220');
@@ -241,7 +242,7 @@ export default function FactoryOrdersScreen() {
     try {
       await rawRequest('/factory-orders', {
         method: 'POST',
-        body: JSON.stringify({ items: cart }),
+        body: JSON.stringify({ items: cart, date: orderDate }),
       });
       setCart([]);
       loadData();
@@ -503,6 +504,40 @@ export default function FactoryOrdersScreen() {
       {/* 4. CURRENT ORDER CALCULATION & CART */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Current Order Calculation</Text>
+
+        {/* Purchase Date for past backfill or today */}
+        <View style={{ marginBottom: spacing.md, padding: spacing.sm, backgroundColor: neutral[100], borderRadius: radius.md, borderWidth: 1, borderColor: neutral[200] }}>
+          <Text style={[styles.fieldLabel, { marginBottom: 4 }]}>
+            📅 FACTORY PURCHASE DATE ({orderDate === new Date().toISOString().slice(0, 10) ? 'TODAY' : 'PAST BACKFILL'})
+          </Text>
+          <TextInput
+            style={[styles.textInput, { fontFamily: fontFamily.mono, fontWeight: '700', backgroundColor: '#FFFFFF' }]}
+            value={orderDate}
+            onChangeText={setOrderDate}
+            placeholder="YYYY-MM-DD"
+          />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {['2026-10-01', '2026-09-30', '2026-09-29', '2026-09-28', '2026-09-27'].map((d) => (
+              <TouchableOpacity
+                key={d}
+                onPress={() => setOrderDate(d)}
+                style={[
+                  styles.qtyBadge,
+                  orderDate === d ? { backgroundColor: brand.black, borderColor: brand.black } : {},
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.qtyBadgeText,
+                    orderDate === d ? { color: '#FFFFFF', fontWeight: '800' } : {},
+                  ]}
+                >
+                  {d === new Date().toISOString().slice(0, 10) ? 'Today' : d.slice(5)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {cart.length === 0 ? (
           <Text style={styles.emptyText}>No products added yet. Select a product above to calculate.</Text>

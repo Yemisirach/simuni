@@ -10,6 +10,7 @@ export default function FactoryOrdersPage() {
   const [loading, setLoading] = useState(true);
 
   // Form State
+  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [buyPrice, setBuyPrice] = useState(0);
@@ -93,7 +94,7 @@ export default function FactoryOrdersPage() {
     try {
       await fetchApi('/factory-orders', {
         method: 'POST',
-        body: JSON.stringify({ items: cart })
+        body: JSON.stringify({ items: cart, date: orderDate }),
       });
       setCart([]);
       loadData(); // Refresh history
@@ -126,6 +127,46 @@ export default function FactoryOrdersPage() {
             <button onClick={handleTopUp} className="bg-accent text-primary-darker px-3 py-1 rounded-lg font-bold text-sm">
               Top Up
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* PURCHASE DATE SELECTOR FOR PAST & TODAY PURCHASES */}
+      <div className="bg-surface border border-border p-4 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-primary font-serif">📅 Purchase Date for Restock:</span>
+            <span className="text-xs px-2.5 py-0.5 rounded font-mono font-bold bg-accent/20 text-primary-darker">
+              {orderDate === new Date().toISOString().slice(0, 10) ? 'Today' : 'Past Date Backfill'}
+            </span>
+          </div>
+          <p className="text-xs text-text-muted mt-0.5">
+            Log factory orders for any past date so they link to that specific day's Daily Sales ledger (IN +Y pk).
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            value={orderDate}
+            onChange={(e) => setOrderDate(e.target.value)}
+            className="bg-bg border border-border px-3 py-1.5 rounded-lg text-sm font-bold font-mono text-primary outline-none focus:ring-2 focus:ring-accent"
+          />
+          <div className="flex items-center gap-1.5">
+            {['2026-10-01', '2026-09-30', '2026-09-29', '2026-09-28', '2026-09-27'].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setOrderDate(d)}
+                className={`px-2.5 py-1 rounded-md text-xs font-mono font-semibold border transition-colors ${
+                  orderDate === d
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-bg text-text-muted border-border hover:bg-gray-100'
+                }`}
+              >
+                {d === new Date().toISOString().slice(0, 10) ? 'Today' : d.slice(5)}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -247,7 +288,9 @@ export default function FactoryOrdersPage() {
             <tbody className="divide-y divide-border">
               {history.map(order => (
                 <tr key={order.id} className="hover:bg-bg/50">
-                  <td className="px-6 py-4">{new Date(order.date).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 font-mono font-bold text-primary">
+                    {order.date ? new Date(order.date).toISOString().slice(0, 10) : ''}
+                  </td>
                   <td className="px-6 py-4">
                     <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-bold">
                       {order.status}
