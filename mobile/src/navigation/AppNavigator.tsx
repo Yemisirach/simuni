@@ -18,6 +18,7 @@ import FactoryOrdersScreen from '../screens/FactoryOrdersScreen';
 import CustomerListScreen from '../screens/CustomerListScreen';
 import CreateCustomerScreen from '../screens/CreateCustomerScreen';
 import FieldSurveyScreen from '../screens/FieldSurveyScreen';
+import { fontFamily } from '../theme';
 
 export type RoutesStackParamList = {
   RouteList: undefined;
@@ -40,7 +41,7 @@ const Tab = createBottomTabNavigator();
 const commonHeaderOptions = {
   headerStyle: { backgroundColor: '#1A1A1A' },
   headerTintColor: '#FFFFFF',
-  headerTitleStyle: { fontFamily: 'serif', fontWeight: '700' as const },
+  headerTitleStyle: { fontFamily: fontFamily.sans, fontWeight: '700' as const, letterSpacing: -0.3 },
 };
 
 function RoutesStackNavigator() {
@@ -78,7 +79,8 @@ function MainTabNavigator() {
           borderTopColor: '#E5E5E3',
         },
         tabBarLabelStyle: {
-          fontFamily: 'sans-serif',
+          fontFamily: fontFamily.sans,
+          fontWeight: '600',
           fontSize: 11,
         },
         tabBarIcon: ({ focused }) => {

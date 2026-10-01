@@ -106,7 +106,7 @@ export default function DeliveryConfirmScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: neutral[100], padding: spacing.lg },
-  customerName: { fontFamily: fontFamily.serif, fontSize: 24, fontWeight: '800', color: brand.black, textAlign: 'center', marginTop: spacing.lg },
+  customerName: { fontFamily: fontFamily.sans, fontSize: 24, fontWeight: '800', color: brand.black, textAlign: 'center', marginTop: spacing.lg, letterSpacing: -0.5 },
   subtitle: { fontFamily: fontFamily.sans, fontSize: 14, color: neutral[600], textAlign: 'center', marginBottom: spacing['2xl'] },
   timeline: { marginBottom: spacing.xl, marginLeft: spacing.md },
   timelineRow: { flexDirection: 'row', alignItems: 'flex-start' },

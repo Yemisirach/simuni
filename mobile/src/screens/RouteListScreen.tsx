@@ -272,10 +272,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   activeRouteTitle: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 16,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.16,
     marginTop: 2,
   },
   activeRouteSub: {
@@ -285,7 +286,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   continueButton: {
-    backgroundColor: brand.black,
+    backgroundColor: brand.gold,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: radius.sm,
@@ -294,9 +295,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: brand.black,
   },
-  empty: { textAlign: 'center', marginTop: spacing.xl, color: neutral[600] },
+  empty: { fontFamily: fontFamily.sans, textAlign: 'center', marginTop: spacing.xl, color: neutral[600] },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: radius.md,
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontFamily: fontFamily.serif, fontSize: 17, fontWeight: '700', color: brand.black },
+  cardTitle: { fontFamily: fontFamily.sans, fontSize: 16, fontWeight: '700', color: brand.black, letterSpacing: -0.16 },
   activeTag: {
     fontFamily: fontFamily.sans,
     fontSize: 11,
@@ -365,7 +366,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   modalEmoji: { fontSize: 32, marginBottom: 4 },
-  modalTitle: { fontFamily: fontFamily.serif, fontSize: 20, fontWeight: '800', color: brand.black },
+  modalTitle: { fontFamily: fontFamily.sans, fontSize: 20, fontWeight: '800', color: brand.black, letterSpacing: -0.3 },
   modalSubtitle: { fontFamily: fontFamily.sans, fontSize: 13, color: neutral[600], marginTop: 2, textAlign: 'center' },
   modalRouteCard: {
     flexDirection: 'row',
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
     borderColor: brand.gold,
     backgroundColor: '#FDFBF4',
   },
-  modalRouteName: { fontFamily: fontFamily.serif, fontSize: 15, fontWeight: '700', color: brand.black },
+  modalRouteName: { fontFamily: fontFamily.sans, fontSize: 15, fontWeight: '700', color: brand.black, letterSpacing: -0.1 },
   modalRouteStops: { fontFamily: fontFamily.sans, fontSize: 12, color: neutral[600], marginTop: 2 },
   selectBadge: {
     backgroundColor: brand.gold,

@@ -182,8 +182,8 @@ export default function HubScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: neutral[100] },
   header: { padding: spacing.lg, paddingBottom: spacing.sm },
-  overline: { fontFamily: fontFamily.sans, fontSize: 10, fontWeight: '700', letterSpacing: 1, color: neutral[500], marginBottom: spacing.xs },
-  pageTitle: { fontFamily: fontFamily.serif, fontSize: 28, color: brand.black, fontWeight: '700' },
+  overline: { fontFamily: fontFamily.sans, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, color: neutral[500], marginBottom: spacing.xs, textTransform: 'uppercase' },
+  pageTitle: { fontFamily: fontFamily.sans, fontSize: 26, color: brand.black, fontWeight: '700', letterSpacing: -0.5 },
   clock: { fontFamily: fontFamily.mono, fontSize: 12, color: neutral[600], marginTop: spacing.xs },
   kpiRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md },
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },

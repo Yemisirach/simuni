@@ -107,7 +107,8 @@ if ('caches' in window) {
   });
 }
 </script>`;
-        htmlStr = htmlStr.replace('</head>', swCleaner + '</head>');
+        const fontLinks = `<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">\n`;
+        htmlStr = htmlStr.replace('</head>', fontLinks + swCleaner + '</head>');
         // Cache bust script bundle references
         htmlStr = htmlStr.replace(/src="([^"]+\.js)"/g, 'src="$1?v=' + Date.now() + '"');
         outputData = Buffer.from(htmlStr, 'utf8');

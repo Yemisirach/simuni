@@ -20,8 +20,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   title: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
     color: brand.black,
     marginBottom: spacing.md,
   },

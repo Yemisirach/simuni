@@ -137,11 +137,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnPrimary: {
-    backgroundColor: colors?.brand?.black || '#1A1A1A',
+    backgroundColor: colors?.brand?.gold || '#C4A35A',
   },
   btnPrimaryText: {
-    color: colors?.neutral?.[50] || '#FFF',
-    fontWeight: 'bold',
+    color: colors?.brand?.black || '#1A1A1A',
+    fontWeight: '700',
+    fontFamily: fontFamily.sans,
+    fontSize: 13,
   },
   btnSecondary: {
     backgroundColor: 'transparent',
@@ -150,7 +152,9 @@ const styles = StyleSheet.create({
   },
   btnSecondaryText: {
     color: colors?.brand?.black || '#1A1A1A',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    fontFamily: fontFamily.sans,
+    fontSize: 13,
   },
 });
 

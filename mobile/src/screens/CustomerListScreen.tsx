@@ -38,10 +38,10 @@ export default function CustomerListScreen({ navigation }: any) {
           <Text style={styles.addButtonText}>+ New</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.addButton, { backgroundColor: '#1A1A1A', marginLeft: 6 }]} 
+          style={[styles.addButton, { backgroundColor: brand.gold, borderWidth: 1, borderColor: brand.gold, marginLeft: 6 }]} 
           onPress={() => navigation.navigate('FieldSurvey')}
         >
-          <Text style={[styles.addButtonText, { color: '#C4A35A' }]}>📍 Survey</Text>
+          <Text style={[styles.addButtonText, { color: brand.black }]}>📍 Survey</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -53,7 +53,7 @@ export default function CustomerListScreen({ navigation }: any) {
           <View style={styles.card}>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.phone}>{item.phone} • {item.address || 'No address'}</Text>
+              <Text style={styles.phone}><Text style={{ fontFamily: fontFamily.mono }}>{item.phone}</Text> • {item.address || 'No address'}</Text>
             </View>
             <TouchableOpacity 
               style={styles.orderButton} 
@@ -71,13 +71,13 @@ export default function CustomerListScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: neutral[100] },
   header: { flexDirection: 'row', padding: spacing.md, backgroundColor: '#FFF', borderBottomWidth: 1, borderColor: neutral[200], gap: spacing.sm },
-  searchInput: { flex: 1, backgroundColor: neutral[100], borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
+  searchInput: { flex: 1, backgroundColor: neutral[100], borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: fontFamily.sans, color: brand.black },
   addButton: { backgroundColor: brand.gold, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radius.md },
-  addButtonText: { fontWeight: 'bold', color: brand.black },
-  empty: { textAlign: 'center', marginTop: 20, color: neutral[500] },
+  addButtonText: { fontFamily: fontFamily.sans, fontWeight: '700', fontSize: 13, color: brand.black },
+  empty: { fontFamily: fontFamily.sans, textAlign: 'center', marginTop: 20, color: neutral[500], fontSize: 13 },
   card: { flexDirection: 'row', backgroundColor: '#FFF', padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md, alignItems: 'center', ...shadows.sm },
-  name: { fontSize: 16, fontWeight: 'bold', color: brand.black },
-  phone: { fontSize: 13, color: neutral[600], marginTop: 4 },
-  orderButton: { backgroundColor: brand.black, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.sm },
-  orderButtonText: { color: brand.gold, fontWeight: 'bold', fontSize: 12 }
+  name: { fontFamily: fontFamily.sans, fontSize: 16, fontWeight: '700', color: brand.black, letterSpacing: -0.16 },
+  phone: { fontFamily: fontFamily.sans, fontSize: 13, color: neutral[600], marginTop: 4 },
+  orderButton: { backgroundColor: brand.gold, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.sm },
+  orderButtonText: { fontFamily: fontFamily.sans, color: brand.black, fontWeight: '700', fontSize: 12 },
 });

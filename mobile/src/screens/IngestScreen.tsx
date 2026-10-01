@@ -1141,11 +1141,11 @@ const styles = StyleSheet.create({
     color: neutral[600],
   },
   metricLargeNumber: {
-    fontFamily: fontFamily.sans,
-    fontSize: 24,
+    fontFamily: fontFamily.mono,
+    fontSize: 26,
     fontWeight: '800',
     color: brand.black,
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   metricCardSub: {
     fontFamily: fontFamily.sans,
@@ -1246,10 +1246,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionHeading: {
-    fontFamily: fontFamily.serif,
-    fontSize: 16,
+    fontFamily: fontFamily.sans,
+    fontSize: 18,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.3,
   },
   sectionMetaRight: {
     fontFamily: fontFamily.sans,
@@ -1335,10 +1336,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   variantItemName: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 15,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.1,
   },
   editPillBtn: {
     flexDirection: 'row',
@@ -1542,10 +1544,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   modalTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 16,
+    fontFamily: fontFamily.sans,
+    fontSize: 18,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.3,
   },
   modalSubtitle: {
     fontFamily: fontFamily.sans,
@@ -1574,10 +1577,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   modalVCardTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 13,
+    fontFamily: fontFamily.sans,
+    fontSize: 14,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.1,
   },
   modalVCardPill: {
     fontFamily: fontFamily.sans,

@@ -609,9 +609,10 @@ const styles = StyleSheet.create({
   },
   balanceAmount: {
     fontFamily: fontFamily.mono,
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: '800',
     color: brand.black,
+    letterSpacing: -1.0,
     marginTop: 2,
   },
   balancePill: {
@@ -634,9 +635,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 14,
     color: brand.black,
+    fontFamily: fontFamily.mono,
   },
   topUpButton: {
-    backgroundColor: brand.black,
+    backgroundColor: brand.gold,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: radius.sm,
@@ -647,7 +649,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 13,
     fontWeight: '700',
-    color: brand.gold,
+    color: brand.black,
   },
 
   // Base Card
@@ -661,10 +663,11 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
   cardTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 17,
+    fontFamily: fontFamily.sans,
+    fontSize: 16,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.16,
   },
   cardSubtitle: {
     fontFamily: fontFamily.sans,
@@ -780,10 +783,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   productPillTitle: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 14,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.1,
   },
   productPillTitleSelected: {
     color: '#9E7412',
@@ -814,7 +818,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   pricingBannerTitle: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 13,
     fontWeight: '700',
     color: brand.black,
@@ -914,10 +918,11 @@ const styles = StyleSheet.create({
     borderColor: neutral[200],
   },
   cartItemTitle: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 14,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.1,
   },
   cartItemDetails: {
     fontFamily: fontFamily.sans,

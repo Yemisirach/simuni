@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   currentStopHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   currentStopLabel: { fontFamily: fontFamily.sans, fontSize: 12, fontWeight: '700', color: neutral[600] },
-  currentStopName: { fontFamily: fontFamily.serif, fontSize: 18, color: brand.black, fontWeight: '700' },
+  currentStopName: { fontFamily: fontFamily.sans, fontSize: 18, color: brand.black, fontWeight: '700', letterSpacing: -0.3 },
   currentStopAddress: { fontFamily: fontFamily.sans, fontSize: 14, color: neutral[600], marginTop: 2 },
   footer: { padding: spacing.md, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: neutral[200] },
   secondaryButton: {

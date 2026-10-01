@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: brand.black },
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: spacing.xl },
   brand: { alignItems: 'center', marginBottom: spacing.xl },
-  brandTitle: { fontFamily: fontFamily.serif, fontSize: 40, fontWeight: '800', color: '#FFFFFF' },
+  brandTitle: { fontFamily: fontFamily.sans, fontSize: 36, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1.0 },
   brandSubtitle: { fontFamily: fontFamily.sans, fontSize: 16, color: neutral[400], marginTop: spacing.xs },
   decorativeLine: {
     width: 40,
@@ -233,6 +233,7 @@ const styles = StyleSheet.create({
   },
   label: { fontFamily: fontFamily.sans, fontSize: 13, color: neutral[600], marginBottom: spacing.xs, marginTop: spacing.md },
   input: {
+    fontFamily: fontFamily.sans,
     borderWidth: 1,
     borderColor: neutral[200],
     borderRadius: radius.sm,
@@ -279,11 +280,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   modalTitle: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 22,
     fontWeight: '800',
     color: brand.black,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   modalSubtitle: {
     fontFamily: fontFamily.sans,
@@ -304,10 +306,11 @@ const styles = StyleSheet.create({
     borderColor: neutral[200],
   },
   routeCardName: {
-    fontFamily: fontFamily.serif,
+    fontFamily: fontFamily.sans,
     fontSize: 16,
     fontWeight: '700',
     color: brand.black,
+    letterSpacing: -0.16,
   },
   routeCardStops: {
     fontFamily: fontFamily.sans,

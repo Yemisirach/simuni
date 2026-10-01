@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
 import { api } from '../api/client';
-import { brand, neutral, spacing, radius } from '../theme';
+import { brand, neutral, spacing, radius, fontFamily } from '../theme';
 
 export default function CreateCustomerScreen({ navigation }: any) {
   const [name, setName] = useState('');
@@ -54,9 +54,9 @@ export default function CreateCustomerScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: neutral[100], padding: spacing.lg },
-  label: { fontWeight: 'bold', marginBottom: 6, color: neutral[700] },
-  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: neutral[200], padding: 14, borderRadius: radius.md, marginBottom: spacing.md, fontSize: 16 },
-  gpsNote: { color: neutral[500], fontSize: 13, marginBottom: spacing.xl, textAlign: 'center' },
+  label: { fontFamily: fontFamily.sans, fontWeight: '700', fontSize: 13, marginBottom: 6, color: neutral[700] },
+  input: { fontFamily: fontFamily.sans, backgroundColor: '#FFF', borderWidth: 1, borderColor: neutral[200], padding: 14, borderRadius: radius.md, marginBottom: spacing.md, fontSize: 15, color: brand.black },
+  gpsNote: { fontFamily: fontFamily.sans, color: neutral[500], fontSize: 12, marginBottom: spacing.xl, textAlign: 'center' },
   button: { backgroundColor: brand.gold, padding: 16, borderRadius: radius.md, alignItems: 'center' },
-  buttonText: { fontWeight: 'bold', fontSize: 16, color: brand.black }
+  buttonText: { fontFamily: fontFamily.sans, fontWeight: '700', fontSize: 15, color: brand.black },
 });
