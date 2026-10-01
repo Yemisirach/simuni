@@ -322,6 +322,33 @@ export class ReportsService {
     };
   }
 
+  async resetDailySales(workspaceId: string | undefined, date?: string) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    const org = await this.prisma.organization.findUnique({ where: { id: wsId } });
+    if (!org) throw new NotFoundException('Workspace not found');
+
+    const metadata = this.parseMetadata(org.metadata);
+    if (!metadata.dailySalesSnapshots) {
+      metadata.dailySalesSnapshots = {};
+    }
+
+    if (date) {
+      delete metadata.dailySalesSnapshots[date];
+    } else {
+      metadata.dailySalesSnapshots = {};
+    }
+
+    await this.prisma.organization.update({
+      where: { id: wsId },
+      data: { metadata: JSON.stringify(metadata) },
+    });
+
+    return {
+      success: true,
+      message: date ? `Daily sales report reset for ${date}` : 'All daily sales reports have been reset.',
+    };
+  }
+
   async getPreviousReport(workspaceId: string | undefined, date?: string) {
     const wsId = await this.resolveWorkspaceId(workspaceId);
     const { start } = this.reportDay(date);

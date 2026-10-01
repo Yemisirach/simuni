@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ReportsService } from './reports.service';
 
@@ -14,6 +14,11 @@ export class ReportsController {
   @Post('daily-sales/inventory-snapshot')
   saveInventorySnapshot(@CurrentUser() user: any, @Body() data: any) {
     return this.reportsService.saveInventorySnapshot(user?.workspaceId, data);
+  }
+
+  @Delete('daily-sales')
+  resetDailySales(@CurrentUser() user: any, @Query('date') date?: string) {
+    return this.reportsService.resetDailySales(user?.workspaceId, date);
   }
 
   @Get('daily-sales/previous')
