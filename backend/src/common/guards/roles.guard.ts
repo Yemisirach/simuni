@@ -19,7 +19,23 @@ export class RolesGuard implements CanActivate {
     ]);
     if (!requiredRoles) return true;
 
-    const { user } = context.switchToHttp().getRequest().session ?? {};
-    return requiredRoles.includes(user?.role);
+    const req = context.switchToHttp().getRequest();
+    const user = req._simuniUser || req.user || req.session?.user;
+    if (!user) return false;
+
+    const userRole = (user.role || '').toUpperCase();
+    const orgRole = (user.orgRole || '').toUpperCase();
+
+    // Check if required roles match:
+    // OWNER: matches SimuniRole.OWNER, orgRole 'OWNER', or userRole 'OWNER'
+    // MANAGER: matches SimuniRole.MANAGER, orgRole 'ADMIN' / 'OWNER', or userRole 'ADMIN' / 'OWNER'
+    const isOwner = userRole === 'OWNER' || orgRole === 'OWNER';
+    const isManager = isOwner || userRole === 'MANAGER' || orgRole === 'ADMIN' || userRole === 'ADMIN';
+
+    if (requiredRoles.includes(SimuniRole.OWNER) && isOwner) return true;
+    if (requiredRoles.includes(SimuniRole.MANAGER) && isManager) return true;
+    if (requiredRoles.includes(SimuniRole.AGENT)) return true;
+
+    return requiredRoles.includes(user.role as SimuniRole);
   }
 }

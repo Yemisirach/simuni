@@ -25,9 +25,6 @@ export class WorkspaceContextGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const session = request.session;
 
-    // Better Auth's own guard should already have rejected unauthenticated
-    // requests; this is a defensive fallback (e.g. for @AllowAnonymous()
-    // routes that don't need workspace context at all).
     if (!session?.user) return true;
 
     let workspaceId: string | undefined = session.session?.activeOrganizationId;
@@ -47,10 +44,21 @@ export class WorkspaceContextGuard implements CanActivate {
       role = membership.role;
     }
 
-    session.user.workspaceId = workspaceId;
-    session.user.role = fromOrgRole(role || 'member');
-    request.user = session.user;
+    const resolvedRole = fromOrgRole(role || 'member');
+    const userCopy = {
+      ...session.user,
+      workspaceId,
+      role: resolvedRole,
+      orgRole: role || 'member',
+    };
+
+    request._simuniUser = userCopy;
+    request.user = userCopy;
     request.workspaceId = workspaceId;
+
+    try {
+      Object.defineProperty(request, 'user', { value: userCopy, configurable: true, writable: true });
+    } catch {}
 
     return true;
   }

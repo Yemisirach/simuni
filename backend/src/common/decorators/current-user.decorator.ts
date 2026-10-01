@@ -12,6 +12,5 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
  */
 export const CurrentUser = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
   const request = ctx.switchToHttp().getRequest();
-  const sessionUser = request.session?.user;
-  return sessionUser?.workspaceId ? sessionUser : request.user || sessionUser;
+  return request._simuniUser || request.user || request.session?.user;
 });

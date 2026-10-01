@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { auth } from '../auth/better-auth.instance';
 import { toOrgRole } from '../auth/roles';
@@ -17,17 +17,50 @@ export class UsersService {
   async create(workspaceId: string, dto: CreateUserDto) {
     const email = dto.email || `${dto.phone}@users.simuni.app`;
 
-    const signUpResult = await auth.api.signUpEmail({
-      body: { email, password: dto.password, name: dto.name, username: dto.phone } as any,
+    let userId: string;
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          { username: dto.phone },
+          { phoneNumber: dto.phone },
+        ],
+      },
     });
-    const userId = (signUpResult as any).user.id;
 
-    await this.prisma.member.create({
-      data: { organizationId: workspaceId, userId, role: toOrgRole(dto.role as any) },
+    if (existingUser) {
+      userId = existingUser.id;
+      const existingMember = await this.prisma.member.findUnique({
+        where: { organizationId_userId: { organizationId: workspaceId, userId } },
+      });
+      if (existingMember) {
+        throw new ConflictException(`A user with phone number ${dto.phone} already belongs to this workspace.`);
+      }
+      await this.prisma.member.create({
+        data: { organizationId: workspaceId, userId, role: toOrgRole(dto.role as any) },
+      });
+    } else {
+      const signUpResult = await auth.api.signUpEmail({
+        body: { email, password: dto.password, name: dto.name, username: dto.phone } as any,
+      });
+      userId = (signUpResult as any).user.id;
+
+      await this.prisma.member.create({
+        data: { organizationId: workspaceId, userId, role: toOrgRole(dto.role as any) },
+      });
+    }
+
+    // Ensure phoneNumber is set for phone login
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { phoneNumber: dto.phone, name: dto.name },
     });
 
     if (dto.role === 'AGENT') {
-      await this.prisma.agentProfile.create({ data: { userId } });
+      const existingProfile = await this.prisma.agentProfile.findUnique({ where: { userId } });
+      if (!existingProfile) {
+        await this.prisma.agentProfile.create({ data: { userId } });
+      }
     }
 
     return this.findOne(workspaceId, userId);
