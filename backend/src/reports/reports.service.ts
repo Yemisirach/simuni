@@ -162,15 +162,19 @@ export class ReportsService {
       // Determine Opening Stock:
       // Priority 1: Current saved snapshot openingStock
       // Priority 2: Previous day snapshot's closingStock
-      // Priority 3: Derived from product.stock (currentStock - receivedToday + soldToday)
+      // Priority 3: For today or future, derived from product.stock (currentStock - receivedToday + soldToday)
+      // For past unrecorded days without snapshots, defaults to 0
       const orderSold = orderAgg?.packQty || 0;
+      const todayStr = new Date().toISOString().slice(0, 10);
       let openingStock = 0;
       if (snapshotVariant?.openingStock !== undefined) {
         openingStock = Number(snapshotVariant.openingStock);
       } else if (prevVariant?.closingStock !== undefined) {
         openingStock = Number(prevVariant.closingStock);
-      } else {
+      } else if (day >= todayStr) {
         openingStock = Math.max(0, p.stock - factoryReceived + orderSold);
+      } else {
+        openingStock = 0;
       }
 
       // Determine Sold Quantity:
@@ -336,6 +340,10 @@ export class ReportsService {
       delete metadata.dailySalesSnapshots[date];
     } else {
       metadata.dailySalesSnapshots = {};
+      await this.prisma.product.updateMany({
+        where: { workspaceId: wsId },
+        data: { stock: 0 },
+      });
     }
 
     await this.prisma.organization.update({
