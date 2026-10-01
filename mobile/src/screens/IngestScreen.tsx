@@ -14,55 +14,6 @@ import {
 import { api } from '../api/client';
 import { brand, neutral, semantic, spacing, radius, fontFamily, shadows } from '../theme';
 
-// Official Factory Pricing Matrix from Company Specification
-interface PriceInfo {
-  size: string;
-  name: string;
-  bottlesPerPack: number;
-  addis: { prev: number; new: number; margin: number; retail: number };
-  regional: { prev: number; new: number };
-}
-
-const FACTORY_PRICING_CATALOG: PriceInfo[] = [
-  {
-    size: '0.35L',
-    name: 'Topwater 0.35L',
-    bottlesPerPack: 24,
-    addis: { prev: 172, new: 220, margin: 32, retail: 252 },
-    regional: { prev: 165.5, new: 215.5 },
-  },
-  {
-    size: '0.60L',
-    name: 'Topwater 0.60L',
-    bottlesPerPack: 24,
-    addis: { prev: 220, new: 270, margin: 32, retail: 302 },
-    regional: { prev: 201.5, new: 251.5 },
-  },
-  {
-    size: '1.00L',
-    name: 'Topwater 1.00L',
-    bottlesPerPack: 12,
-    addis: { prev: 174, new: 220, margin: 32, retail: 252 },
-    regional: { prev: 161.5, new: 211.5 },
-  },
-  {
-    size: '2.00L',
-    name: 'Topwater 2.00L',
-    bottlesPerPack: 6,
-    addis: { prev: 220, new: 270, margin: 32, retail: 302 },
-    regional: { prev: 203.5, new: 253.5 },
-  },
-];
-
-function matchProductPricing(prodNameOrSku: string): PriceInfo | undefined {
-  const s = (prodNameOrSku || '').toLowerCase();
-  if (s.includes('0.35')) return FACTORY_PRICING_CATALOG[0];
-  if (s.includes('0.6')) return FACTORY_PRICING_CATALOG[1];
-  if (s.includes('1') && !s.includes('0.35') && !s.includes('0.6')) return FACTORY_PRICING_CATALOG[2];
-  if (s.includes('2')) return FACTORY_PRICING_CATALOG[3];
-  return undefined;
-}
-
 interface DailySalesVariant {
   productId: string;
   variant: string;
@@ -117,6 +68,15 @@ function money(value: number) {
   return `ETB ${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
+function getPackSize(nameOrSku: string): number {
+  const s = (nameOrSku || '').toLowerCase();
+  if (s.includes('0.35')) return 24;
+  if (s.includes('0.6')) return 24;
+  if (s.includes('1') && !s.includes('0.35') && !s.includes('0.6')) return 12;
+  if (s.includes('2')) return 6;
+  return 24;
+}
+
 export default function IngestScreen() {
   const [date, setDate] = useState(todayKey());
   const [report, setReport] = useState<DailySalesReport | null>(null);
@@ -124,15 +84,7 @@ export default function IngestScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  // Market & Pricing Tier Selection (from Factory Orders Redesign)
-  const [market, setMarket] = useState<'addis' | 'regional'>('addis');
-  const [priceTier, setPriceTier] = useState<'new' | 'previous'>('new');
-  const [showPriceReference, setShowPriceReference] = useState(false);
-
-  // Calculation mode: 'orders' (live orders) vs 'inventory' (reconcile physical closing count)
-  const [calcMode, setCalcMode] = useState<'orders' | 'inventory'>('orders');
-
-  // Inventory adjustment / previous report state
+  // Inventory adjustment / previous report modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMode, setModalMode] = useState<'previousReport' | 'quickEdit'>('previousReport');
   const [selectedVariant, setSelectedVariant] = useState<DailySalesVariant | null>(null);
@@ -162,7 +114,6 @@ export default function IngestScreen() {
       const data = await api.dailySalesReport(targetDate);
       setReport(data);
 
-      // Initialize modal variant inputs if empty
       if (data?.variants) {
         const initInputs: Record<string, any> = {};
         for (const v of data.variants) {
@@ -183,30 +134,20 @@ export default function IngestScreen() {
     }
   }
 
-  // Dynamically compute variant metrics based on selected Market & Pricing Tier
-  const computedVariants = useMemo(() => {
+  // Clean computed variants using live DB pricing with the 2 ETB discount
+  const variants = useMemo(() => {
     if (!report?.variants) return [];
     return report.variants.map((v) => {
-      const pricing = matchProductPricing(v.variant || v.sku || '');
-      let factoryPrice = v.factoryPrice;
-      let sellingPrice = v.sellingPrice;
-
-      if (pricing) {
-        if (market === 'addis') {
-          factoryPrice = priceTier === 'new' ? pricing.addis.new : pricing.addis.prev;
-          sellingPrice = pricing.addis.retail;
-        } else {
-          factoryPrice = priceTier === 'new' ? pricing.regional.new : pricing.regional.prev;
-          sellingPrice = pricing.addis.retail; // retail standard
-        }
-      }
-
-      const packQty = v.packQty;
+      // Selling price and factory price directly from database
+      const sellingPrice = Number(v.sellingPrice) || 250;
+      const factoryPrice = Number(v.factoryPrice) || 220;
+      const packQty = Number(v.packQty) || 0;
       const salesAmount = packQty * sellingPrice;
       const costAmount = packQty * factoryPrice;
       const marginAmount = salesAmount - costAmount;
       const marginPercent = salesAmount > 0 ? (marginAmount / salesAmount) * 100 : 0;
-      const unitMargin = sellingPrice - factoryPrice;
+      const unitMargin = sellingPrice - factoryPrice; // e.g. 250 - 220 = 30 ETB, or 300 - 270 = 30 ETB
+      const packSize = getPackSize(v.variant || v.sku || '');
 
       return {
         ...v,
@@ -217,14 +158,14 @@ export default function IngestScreen() {
         marginAmount,
         marginPercent: Math.round(marginPercent * 10) / 10,
         unitMargin,
-        bottlesPerPack: pricing?.bottlesPerPack || 24,
+        packSize,
       };
     });
-  }, [report, market, priceTier]);
+  }, [report]);
 
-  // Overall totals recomputed
-  const computedTotals = useMemo(() => {
-    return computedVariants.reduce(
+  // Overall totals
+  const totals = useMemo(() => {
+    return variants.reduce(
       (acc, v) => ({
         packQty: acc.packQty + v.packQty,
         openingStock: acc.openingStock + v.openingStock,
@@ -236,7 +177,7 @@ export default function IngestScreen() {
       }),
       { packQty: 0, openingStock: 0, factoryReceived: 0, remainingPack: 0, salesAmount: 0, costAmount: 0, marginAmount: 0 },
     );
-  }, [computedVariants]);
+  }, [variants]);
 
   // Open modal to add or adjust previous sales report
   const openPreviousReportModal = () => {
@@ -257,7 +198,7 @@ export default function IngestScreen() {
     setModalVisible(true);
   };
 
-  // Open quick edit for a single variant
+  // Open quick edit for single variant count
   const openQuickEdit = (v: DailySalesVariant) => {
     setSelectedVariant(v);
     setModalMode('quickEdit');
@@ -273,9 +214,9 @@ export default function IngestScreen() {
     setModalVisible(true);
   };
 
-  // Handle inventory calculation inside modal:
-  // Formula: ClosingStock = Opening + Inflow - Sold
-  // OR if Closing entered: Sold = Opening + Inflow - Closing
+  // Input change inside modal:
+  // ClosingStock = Opening + Inflow - Sold
+  // OR if Physical Count entered: Sold = Opening + Inflow - Physical Count
   const handleModalInputChange = (
     productId: string,
     field: 'openingStock' | 'factoryReceived' | 'soldQty' | 'closingStock',
@@ -291,10 +232,8 @@ export default function IngestScreen() {
       const close = Number(updated.closingStock) || 0;
 
       if (field === 'soldQty' || field === 'openingStock' || field === 'factoryReceived') {
-        // Auto-recalculate closing stock
         updated.closingStock = String(Math.max(0, open + inflow - sold));
       } else if (field === 'closingStock') {
-        // Auto-calculate sold quantity from inventory count: Sold = Open + Inflow - Closing
         updated.soldQty = String(Math.max(0, open + inflow - close));
       }
 
@@ -308,7 +247,7 @@ export default function IngestScreen() {
       setIsSavingSnapshot(true);
       const targetDate = modalMode === 'previousReport' ? modalDate : date;
 
-      const variantsPayload = computedVariants.map((v) => {
+      const variantsPayload = variants.map((v) => {
         const inp = modalVariantInputs[v.productId] || {
           openingStock: String(v.openingStock),
           factoryReceived: String(v.factoryReceived),
@@ -328,8 +267,6 @@ export default function IngestScreen() {
 
       await api.saveInventorySnapshot({
         date: targetDate,
-        market,
-        priceTier,
         notes: modalNotes,
         variants: variantsPayload,
         updateProductStock: true,
@@ -337,7 +274,7 @@ export default function IngestScreen() {
 
       Alert.alert(
         'Inventory Saved',
-        `Sales & inventory report for ${targetDate} recorded successfully. Product inventory updated.`,
+        `Sales & inventory report for ${targetDate} saved successfully. Inventory updated in database.`,
       );
       setModalVisible(false);
       loadReport(date, true);
@@ -355,7 +292,6 @@ export default function IngestScreen() {
       const yesterday = shiftDate(date, -1);
       const prevData = await api.dailySalesReport(yesterday);
       if (prevData?.variants && prevData.variants.length > 0) {
-        // Set yesterday's remainingPack as today's openingStock
         const newInputs: Record<string, any> = {};
         for (const v of prevData.variants) {
           const ending = v.remainingPack ?? 0;
@@ -368,11 +304,11 @@ export default function IngestScreen() {
         }
         setModalVariantInputs(newInputs);
         Alert.alert(
-          'Previous Report Loaded',
+          'Previous Stock Loaded',
           `Loaded report from ${yesterday}. Yesterday's ending inventory is now set as opening stock.`,
         );
       } else {
-        Alert.alert('Notice', `No previous sales report found for ${yesterday}. You can enter values manually.`);
+        Alert.alert('Notice', `No previous report recorded for ${yesterday}. You can enter values manually.`);
       }
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not fetch previous report.');
@@ -391,12 +327,12 @@ export default function IngestScreen() {
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <View style={styles.badgeRow}>
-            <Text style={styles.eyebrow}>SIMUNI DISPATCH · INGEST</Text>
+            <Text style={styles.eyebrow}>ETHIOPIA B2B DISPATCH · SALES & INVENTORY</Text>
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>INVENTORY ACTIVE</Text>
+            <Text style={styles.liveText}>SYNCED</Text>
           </View>
           <Text style={styles.title}>Daily Sales Report</Text>
-          <Text style={styles.subtitle}>Factory buy prices, variant sales & inventory reconciliation</Text>
+          <Text style={styles.subtitle}>Sales, factory inflow & stock calculation from database</Text>
         </View>
         <Pressable
           style={[styles.todayButton, isToday && styles.todayButtonActive]}
@@ -411,22 +347,22 @@ export default function IngestScreen() {
       {/* 2. Date Navigation Bar */}
       <View style={styles.dateBar}>
         <Pressable style={styles.dateNavBtn} onPress={() => setDate(shiftDate(date, -1))}>
-          <Text style={styles.dateNavBtnText}>‹ Prev Day</Text>
+          <Text style={styles.dateNavBtnText}>‹ Prev</Text>
         </Pressable>
         <View style={styles.datePill}>
           <Text style={styles.dateLabel}>{date}</Text>
           {report?.hasSnapshot && (
             <View style={styles.snapshotBadge}>
-              <Text style={styles.snapshotBadgeText}>SAVED SNAPSHOT</Text>
+              <Text style={styles.snapshotBadgeText}>SAVED</Text>
             </View>
           )}
         </View>
         <Pressable style={styles.dateNavBtn} onPress={() => setDate(shiftDate(date, 1))}>
-          <Text style={styles.dateNavBtnText}>Next Day ›</Text>
+          <Text style={styles.dateNavBtnText}>Next ›</Text>
         </Pressable>
       </View>
 
-      {/* 3. Action Bar: Add Previous Report & Load Previous Stock */}
+      {/* 3. Action Buttons */}
       <View style={styles.actionBar}>
         <Pressable style={styles.primaryActionBtn} onPress={openPreviousReportModal}>
           <Text style={styles.primaryActionBtnText}>➕ Add / Input Previous Sales Report</Text>
@@ -436,124 +372,7 @@ export default function IngestScreen() {
         </Pressable>
       </View>
 
-      {/* 4. Market & Factory Pricing Matrix Controls (from Factory Orders Screen) */}
-      <View style={styles.controlCard}>
-        <View style={styles.controlHeaderRow}>
-          <Text style={styles.controlTitle}>Factory Pricing Configuration</Text>
-          <Pressable onPress={() => setShowPriceReference(!showPriceReference)}>
-            <Text style={styles.toggleReferenceText}>
-              {showPriceReference ? 'Hide Price Table ▲' : 'View Official Matrix ▼'}
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Market Selector */}
-        <Text style={styles.fieldLabel}>MARKET CORRIDOR</Text>
-        <View style={styles.segmentedControl}>
-          <Pressable
-            style={[styles.segmentButton, market === 'addis' && styles.segmentButtonActive]}
-            onPress={() => setMarket('addis')}
-          >
-            <Text style={[styles.segmentButtonText, market === 'addis' && styles.segmentButtonTextActive]}>
-              📍 Addis Ababa Market
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segmentButton, market === 'regional' && styles.segmentButtonActive]}
-            onPress={() => setMarket('regional')}
-          >
-            <Text style={[styles.segmentButtonText, market === 'regional' && styles.segmentButtonTextActive]}>
-              🌍 Regional Market
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Pricing Tier Selector */}
-        <Text style={styles.fieldLabel}>FACTORY BUY PRICE TIER</Text>
-        <View style={styles.segmentedControl}>
-          <Pressable
-            style={[styles.segmentButton, priceTier === 'new' && styles.segmentButtonActive]}
-            onPress={() => setPriceTier('new')}
-          >
-            <Text style={[styles.segmentButtonText, priceTier === 'new' && styles.segmentButtonTextActive]}>
-              🆕 New Factory Price (220 / 270 ETB)
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segmentButton, priceTier === 'previous' && styles.segmentButtonActive]}
-            onPress={() => setPriceTier('previous')}
-          >
-            <Text style={[styles.segmentButtonText, priceTier === 'previous' && styles.segmentButtonTextActive]}>
-              ⏮️ Previous Price (172 / 220 ETB)
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Calculation Mode Toggle */}
-        <Text style={styles.fieldLabel}>CALCULATION METHOD</Text>
-        <View style={styles.segmentedControl}>
-          <Pressable
-            style={[styles.segmentButton, calcMode === 'orders' && styles.segmentButtonActive]}
-            onPress={() => setCalcMode('orders')}
-          >
-            <Text style={[styles.segmentButtonText, calcMode === 'orders' && styles.segmentButtonTextActive]}>
-              📦 Live Order Manifest
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segmentButton, calcMode === 'inventory' && styles.segmentButtonActive]}
-            onPress={() => setCalcMode('inventory')}
-          >
-            <Text style={[styles.segmentButtonText, calcMode === 'inventory' && styles.segmentButtonTextActive]}>
-              ⚖️ Calculate from Physical Stock Count
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Collapsible Official Price Table */}
-        {showPriceReference && (
-          <View style={styles.tableContainer}>
-            <View style={styles.tableHeaderRow}>
-              <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Variant</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Pack</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1 }]}>
-                {market === 'addis' ? 'Prev Buy' : 'Reg Prev'}
-              </Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1 }]}>
-                {market === 'addis' ? 'New Buy' : 'Reg New'}
-              </Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Retail Price</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Margin</Text>
-            </View>
-
-            {FACTORY_PRICING_CATALOG.map((item, idx) => (
-              <View
-                key={item.size}
-                style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
-              >
-                <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '700' }]}>{item.size}</Text>
-                <Text style={[styles.tableCell, { flex: 0.8, color: neutral[600] }]}>
-                  {item.bottlesPerPack} pcs
-                </Text>
-                <Text style={[styles.tableCell, { flex: 1 }]}>
-                  {market === 'addis' ? `${item.addis.prev} ETB` : `${item.regional.prev} ETB`}
-                </Text>
-                <Text style={[styles.tableCell, { flex: 1, fontWeight: '700', color: brand.black }]}>
-                  {market === 'addis' ? `${item.addis.new} ETB` : `${item.regional.new} ETB`}
-                </Text>
-                <Text style={[styles.tableCell, { flex: 1, color: brand.black }]}>
-                  {item.addis.retail} ETB
-                </Text>
-                <Text style={[styles.tableCell, { flex: 1, color: semantic.successDark, fontWeight: '800' }]}>
-                  +32 ETB
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-
-      {/* 5. Loading / Error / Data Display */}
+      {/* 4. Loading / Error / Data */}
       {loading ? (
         <View style={styles.loadingCard}>
           <ActivityIndicator color={brand.gold} size="large" />
@@ -569,59 +388,59 @@ export default function IngestScreen() {
         </View>
       ) : report ? (
         <>
-          {/* 6. Summary KPI Grid */}
+          {/* 5. Summary KPI Cards */}
           <View style={styles.summaryGrid}>
             <MetricCard
-              label="TOTAL SALES"
-              value={money(computedTotals.salesAmount)}
-              sub={`${computedTotals.packQty} packs sold`}
+              label="TOTAL SALES REVENUE"
+              value={money(totals.salesAmount)}
+              sub={`${totals.packQty} packs sold`}
             />
             <MetricCard
-              label="GROSS MARGIN"
-              value={money(computedTotals.marginAmount)}
-              sub={`${computedTotals.salesAmount > 0 ? ((computedTotals.marginAmount / computedTotals.salesAmount) * 100).toFixed(1) : 0}% margin`}
+              label="GROSS MARGIN (+30 ETB/PK)"
+              value={money(totals.marginAmount)}
+              sub={`${totals.salesAmount > 0 ? ((totals.marginAmount / totals.salesAmount) * 100).toFixed(1) : 0}% net margin`}
               tone="gold"
             />
             <MetricCard
               label="FACTORY COGS"
-              value={money(computedTotals.costAmount)}
-              sub={`At ${priceTier === 'new' ? 'New' : 'Prev'} Buy Price`}
+              value={money(totals.costAmount)}
+              sub="Factory buy price from DB"
             />
             <MetricCard
-              label="REMAINING STOCK"
-              value={`${computedTotals.remainingPack} packs`}
-              sub={`Opening: ${computedTotals.openingStock} + Inflow: ${computedTotals.factoryReceived}`}
+              label="REMAINING INVENTORY"
+              value={`${totals.remainingPack} packs`}
+              sub={`Opening: ${totals.openingStock} | Inflow: +${totals.factoryReceived}`}
               tone="stock"
             />
           </View>
 
-          {/* 7. Inventory Flow & Sales Formula Banner */}
+          {/* 6. Clean Inventory Flow Banner */}
           <View style={styles.formulaBanner}>
-            <Text style={styles.formulaTitle}>INVENTORY ACCOUNTING EQUATION</Text>
+            <Text style={styles.formulaTitle}>INVENTORY ACCOUNTING FLOW</Text>
             <View style={styles.formulaRow}>
               <View style={styles.formulaStep}>
                 <Text style={styles.formulaLabel}>Opening Stock</Text>
-                <Text style={styles.formulaValue}>{computedTotals.openingStock} pk</Text>
+                <Text style={styles.formulaValue}>{totals.openingStock} pk</Text>
               </View>
               <Text style={styles.formulaOp}>+</Text>
               <View style={styles.formulaStep}>
                 <Text style={styles.formulaLabel}>Factory Inflow</Text>
-                <Text style={styles.formulaValue}>+{computedTotals.factoryReceived} pk</Text>
+                <Text style={styles.formulaValue}>+{totals.factoryReceived} pk</Text>
               </View>
               <Text style={styles.formulaOp}>-</Text>
               <View style={styles.formulaStep}>
                 <Text style={styles.formulaLabel}>Sold Qty</Text>
-                <Text style={[styles.formulaValue, { color: '#B91C1C' }]}>-{computedTotals.packQty} pk</Text>
+                <Text style={[styles.formulaValue, { color: '#B91C1C' }]}>-{totals.packQty} pk</Text>
               </View>
               <Text style={styles.formulaOp}>=</Text>
               <View style={[styles.formulaStep, styles.formulaStepActive]}>
                 <Text style={styles.formulaLabelActive}>Closing Stock</Text>
-                <Text style={styles.formulaValueActive}>{computedTotals.remainingPack} pk</Text>
+                <Text style={styles.formulaValueActive}>{totals.remainingPack} pk</Text>
               </View>
             </View>
           </View>
 
-          {/* 8. Source Breakdown */}
+          {/* 7. Source Breakdown Cards */}
           <View style={styles.sourceRow}>
             <SourceCard
               title="Manual Agent Orders"
@@ -639,30 +458,84 @@ export default function IngestScreen() {
             />
           </View>
 
-          {/* 9. Product Variants Section */}
+          {/* 8. Variant Inventory & Sales Table Header */}
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionTitle}>Variant Sales & Inventory Reconciliation</Text>
+              <Text style={styles.sectionTitle}>Variant Sales & Stock Summary</Text>
               <Text style={styles.sectionSubtitle}>
-                Showing 4 official factory sizes · {market === 'addis' ? 'Addis Ababa' : 'Regional'} Corridor
+                Live prices from database with 2 ETB discount (250 / 300 ETB, +30 ETB margin)
               </Text>
             </View>
             <Pressable style={styles.reconcileBtn} onPress={openPreviousReportModal}>
-              <Text style={styles.reconcileBtnText}>Reconcile Stock</Text>
+              <Text style={styles.reconcileBtnText}>Reconcile</Text>
             </Pressable>
           </View>
 
-          {computedVariants.map((variant) => (
-            <VariantCard
-              key={variant.productId}
-              item={variant}
-              market={market}
-              priceTier={priceTier}
-              onQuickEdit={() => openQuickEdit(variant)}
-            />
+          {/* 9. Product Variant Cards */}
+          {variants.map((v) => (
+            <View key={v.productId} style={styles.variantCard}>
+              <View style={styles.variantTop}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.variantTitleRow}>
+                    <Text style={styles.variantName}>{v.variant}</Text>
+                    <View style={styles.variantSkuBadge}>
+                      <Text style={styles.variantSkuText}>{v.packSize} bottles/pack</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.pricingSub}>
+                    Sell: <Text style={styles.boldDark}>{v.sellingPrice} ETB</Text> · Buy: <Text style={styles.boldDark}>{v.factoryPrice} ETB</Text> · Unit Margin: <Text style={styles.marginText}>+{v.unitMargin} ETB</Text>
+                  </Text>
+                </View>
+
+                <Pressable style={styles.quickEditBtn} onPress={() => openQuickEdit(v)}>
+                  <Text style={styles.quickEditBtnText}>✏️ Edit Count</Text>
+                </Pressable>
+              </View>
+
+              {/* Stock Flow Bar */}
+              <View style={styles.flowBar}>
+                <View style={styles.flowItem}>
+                  <Text style={styles.flowLabel}>OPENING</Text>
+                  <Text style={styles.flowVal}>{v.openingStock}</Text>
+                </View>
+                <Text style={styles.flowSym}>+</Text>
+                <View style={styles.flowItem}>
+                  <Text style={styles.flowLabel}>FACTORY</Text>
+                  <Text style={styles.flowVal}>+{v.factoryReceived}</Text>
+                </View>
+                <Text style={styles.flowSym}>-</Text>
+                <View style={styles.flowItem}>
+                  <Text style={styles.flowLabel}>SOLD</Text>
+                  <Text style={[styles.flowVal, { color: '#B91C1C' }]}>-{v.packQty}</Text>
+                </View>
+                <Text style={styles.flowSym}>=</Text>
+                <View style={[styles.flowItem, styles.flowItemHighlight]}>
+                  <Text style={styles.flowLabelHighlight}>REMAINING</Text>
+                  <Text style={styles.flowValHighlight}>{v.remainingPack} pk</Text>
+                </View>
+              </View>
+
+              {/* Financials Row */}
+              <View style={styles.variantFinRow}>
+                <View style={styles.finCol}>
+                  <Text style={styles.finLabel}>TOTAL SALES</Text>
+                  <Text style={styles.finVal}>{money(v.salesAmount)}</Text>
+                </View>
+                <View style={styles.finCol}>
+                  <Text style={styles.finLabel}>FACTORY COST</Text>
+                  <Text style={styles.finVal}>{money(v.costAmount)}</Text>
+                </View>
+                <View style={[styles.finCol, { alignItems: 'flex-end' }]}>
+                  <Text style={styles.finLabel}>GROSS MARGIN</Text>
+                  <Text style={[styles.finVal, { color: semantic.successDark, fontWeight: '900' }]}>
+                    +{money(v.marginAmount)} ({v.marginPercent}%)
+                  </Text>
+                </View>
+              </View>
+            </View>
           ))}
 
-          {/* 10. Save Snapshot Confirmation Button */}
+          {/* 10. Save Snapshot Button */}
           <Pressable style={styles.saveSnapshotFullBtn} onPress={openPreviousReportModal}>
             <Text style={styles.saveSnapshotFullBtnText}>
               💾 Save / Record Inventory Reconciliation for {date}
@@ -683,7 +556,7 @@ export default function IngestScreen() {
                     : `Stock Count: ${selectedVariant?.variant}`}
                 </Text>
                 <Text style={styles.modalSubtitle}>
-                  Calculate sales from inventory (Opening + Inflow - Closing)
+                  Formula: Sold = Opening + Factory Load - Physical Ending Count
                 </Text>
               </View>
               <Pressable onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -711,7 +584,7 @@ export default function IngestScreen() {
               )}
 
               {/* Items in modal */}
-              {(modalMode === 'previousReport' ? computedVariants : (selectedVariant ? [selectedVariant] : [])).map(
+              {(modalMode === 'previousReport' ? variants : (selectedVariant ? [selectedVariant] : [])).map(
                 (v) => {
                   const input = modalVariantInputs[v.productId] || {
                     openingStock: String(v.openingStock),
@@ -720,9 +593,6 @@ export default function IngestScreen() {
                     closingStock: String(v.remainingPack),
                   };
 
-                  const open = Number(input.openingStock) || 0;
-                  const inflow = Number(input.factoryReceived) || 0;
-                  const close = Number(input.closingStock) || 0;
                   const calculatedSold = Number(input.soldQty) || 0;
                   const calcSales = calculatedSold * v.sellingPrice;
                   const calcMargin = calculatedSold * v.unitMargin;
@@ -731,7 +601,9 @@ export default function IngestScreen() {
                     <View key={v.productId} style={styles.modalItemCard}>
                       <View style={styles.modalItemHeader}>
                         <Text style={styles.modalItemTitle}>{v.variant}</Text>
-                        <Text style={styles.modalItemBadge}>{v.unit} ({v.bottlesPerPack} pcs)</Text>
+                        <Text style={styles.modalItemBadge}>
+                          Price: {v.sellingPrice} ETB · Margin: +{v.unitMargin} ETB
+                        </Text>
                       </View>
 
                       <View style={styles.inputGrid}>
@@ -788,7 +660,7 @@ export default function IngestScreen() {
                           Sales: <Text style={{ fontWeight: '800' }}>{money(calcSales)}</Text>
                         </Text>
                         <Text style={[styles.modalCalcText, { color: semantic.successDark }]}>
-                          Est Margin: <Text style={{ fontWeight: '800' }}>+{money(calcMargin)}</Text>
+                          Net Margin (+30 ETB/pk): <Text style={{ fontWeight: '800' }}>+{money(calcMargin)}</Text>
                         </Text>
                       </View>
                     </View>
@@ -797,11 +669,11 @@ export default function IngestScreen() {
               )}
 
               <View style={{ marginTop: spacing.md }}>
-                <Text style={styles.inputColLabel}>REPORT NOTES / DRIVER NAME:</Text>
+                <Text style={styles.inputColLabel}>NOTES / RECONCILIATION REMARKS:</Text>
                 <TextInput
                   style={[styles.numberInput, { height: 60, textAlignVertical: 'top' }]}
                   multiline
-                  placeholder="e.g. Dawit van MB-04 evening inventory reconciliation"
+                  placeholder="e.g. Daily field route closing count verified"
                   value={modalNotes}
                   onChangeText={setModalNotes}
                 />
@@ -901,82 +773,6 @@ function SourceCard({
   );
 }
 
-function VariantCard({
-  item,
-  market,
-  priceTier,
-  onQuickEdit,
-}: {
-  item: any;
-  market: 'addis' | 'regional';
-  priceTier: 'new' | 'previous';
-  onQuickEdit: () => void;
-}) {
-  return (
-    <View style={styles.variantCard}>
-      {/* Header */}
-      <View style={styles.variantTop}>
-        <View style={{ flex: 1 }}>
-          <View style={styles.variantTitleRow}>
-            <Text style={styles.variantName}>{item.variant}</Text>
-            <View style={styles.variantSkuBadge}>
-              <Text style={styles.variantSkuText}>{item.bottlesPerPack} bottles/pack</Text>
-            </View>
-          </View>
-          <Text style={styles.pricingSub}>
-            Buy: {item.factoryPrice} ETB ({priceTier === 'new' ? 'New Tier' : 'Prev Tier'}) · Retail: {item.sellingPrice} ETB · Unit Margin: +{item.unitMargin} ETB
-          </Text>
-        </View>
-
-        <Pressable style={styles.quickEditBtn} onPress={onQuickEdit}>
-          <Text style={styles.quickEditBtnText}>✏️ Edit Count</Text>
-        </Pressable>
-      </View>
-
-      {/* Stock Flow Bar */}
-      <View style={styles.flowBar}>
-        <View style={styles.flowItem}>
-          <Text style={styles.flowLabel}>OPENING</Text>
-          <Text style={styles.flowVal}>{item.openingStock}</Text>
-        </View>
-        <Text style={styles.flowSym}>+</Text>
-        <View style={styles.flowItem}>
-          <Text style={styles.flowLabel}>FACTORY</Text>
-          <Text style={styles.flowVal}>+{item.factoryReceived}</Text>
-        </View>
-        <Text style={styles.flowSym}>-</Text>
-        <View style={styles.flowItem}>
-          <Text style={styles.flowLabel}>SOLD</Text>
-          <Text style={[styles.flowVal, { color: '#B91C1C' }]}>-{item.packQty}</Text>
-        </View>
-        <Text style={styles.flowSym}>=</Text>
-        <View style={[styles.flowItem, styles.flowItemHighlight]}>
-          <Text style={styles.flowLabelHighlight}>REMAINING</Text>
-          <Text style={styles.flowValHighlight}>{item.remainingPack} pk</Text>
-        </View>
-      </View>
-
-      {/* Financials Row */}
-      <View style={styles.variantFinRow}>
-        <View style={styles.finCol}>
-          <Text style={styles.finLabel}>TOTAL SALES</Text>
-          <Text style={styles.finVal}>{money(item.salesAmount)}</Text>
-        </View>
-        <View style={styles.finCol}>
-          <Text style={styles.finLabel}>FACTORY COST</Text>
-          <Text style={styles.finVal}>{money(item.costAmount)}</Text>
-        </View>
-        <View style={[styles.finCol, { alignItems: 'flex-end' }]}>
-          <Text style={styles.finLabel}>GROSS MARGIN</Text>
-          <Text style={[styles.finVal, { color: semantic.successDark, fontWeight: '900' }]}>
-            +{money(item.marginAmount)} ({item.marginPercent}%)
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1070,7 +866,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: neutral[300],
     paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     ...shadows.sm,
   },
   dateNavBtnText: {
@@ -1143,109 +939,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.sans,
     fontSize: 12,
     fontWeight: '700',
-    color: brand.black,
-  },
-
-  // Configuration Card
-  controlCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: neutral[200],
-    ...shadows.sm,
-  },
-  controlHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  controlTitle: {
-    fontFamily: fontFamily.serif,
-    fontSize: 15,
-    fontWeight: '700',
-    color: brand.black,
-  },
-  toggleReferenceText: {
-    fontFamily: fontFamily.sans,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#8C702E',
-  },
-  fieldLabel: {
-    fontFamily: fontFamily.sans,
-    fontSize: 10,
-    fontWeight: '800',
-    color: neutral[600],
-    marginTop: spacing.sm,
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: neutral[100],
-    borderRadius: radius.sm,
-    padding: 3,
-  },
-  segmentButton: {
-    flex: 1,
-    paddingVertical: 7,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-  },
-  segmentButtonActive: {
-    backgroundColor: '#FFFFFF',
-    ...shadows.sm,
-  },
-  segmentButtonText: {
-    fontFamily: fontFamily.sans,
-    fontSize: 11,
-    fontWeight: '600',
-    color: neutral[500],
-  },
-  segmentButtonTextActive: {
-    color: brand.black,
-    fontWeight: '800',
-  },
-
-  // Reference Table
-  tableContainer: {
-    marginTop: spacing.md,
-    borderWidth: 1,
-    borderColor: neutral[200],
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    backgroundColor: neutral[100],
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: neutral[200],
-  },
-  tableHeaderCell: {
-    fontFamily: fontFamily.sans,
-    fontSize: 10,
-    fontWeight: '800',
-    color: neutral[700],
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: neutral[150],
-    alignItems: 'center',
-  },
-  tableRowAlt: {
-    backgroundColor: neutral[50],
-  },
-  tableCell: {
-    fontFamily: fontFamily.mono,
-    fontSize: 11,
     color: brand.black,
   },
 
@@ -1484,6 +1177,16 @@ const styles = StyleSheet.create({
     color: neutral[600],
     marginTop: 3,
   },
+  boldDark: {
+    fontFamily: fontFamily.mono,
+    fontWeight: '700',
+    color: brand.black,
+  },
+  marginText: {
+    fontFamily: fontFamily.mono,
+    color: semantic.successDark,
+    fontWeight: '800',
+  },
   quickEditBtn: {
     backgroundColor: '#FDFBF4',
     borderWidth: 1,
@@ -1581,7 +1284,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Bottom Buttons
+  // Bottom Save Button
   saveSnapshotFullBtn: {
     backgroundColor: brand.gold,
     borderRadius: radius.md,

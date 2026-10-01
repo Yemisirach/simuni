@@ -24,25 +24,25 @@ const FACTORY_PRICING_CATALOG: PriceInfo[] = [
   {
     size: '0.35L',
     name: 'Topwater 0.35L',
-    addis: { prev: 172, new: 220, margin: 32, retail: 252 },
+    addis: { prev: 172, new: 220, margin: 30, retail: 250 },
     regional: { prev: 165.5, new: 215.5 },
   },
   {
     size: '0.60L',
     name: 'Topwater 0.60L',
-    addis: { prev: 220, new: 270, margin: 32, retail: 302 },
+    addis: { prev: 220, new: 270, margin: 30, retail: 300 },
     regional: { prev: 201.5, new: 251.5 },
   },
   {
     size: '1.00L',
     name: 'Topwater 1.00L',
-    addis: { prev: 174, new: 220, margin: 32, retail: 252 },
+    addis: { prev: 174, new: 220, margin: 30, retail: 250 },
     regional: { prev: 161.5, new: 211.5 },
   },
   {
     size: '2.00L',
     name: 'Topwater 2.00L',
-    addis: { prev: 220, new: 270, margin: 32, retail: 302 },
+    addis: { prev: 220, new: 270, margin: 30, retail: 300 },
     regional: { prev: 203.5, new: 253.5 },
   },
 ];
