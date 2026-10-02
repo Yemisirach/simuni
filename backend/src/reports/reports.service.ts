@@ -74,11 +74,11 @@ export class ReportsService {
         for (const v of snap.variants) {
           if (!v.productId) continue;
           const prevClose = runningClosingStockByProduct.get(v.productId) || 0;
-          const snapOpen = v.openingStock !== undefined ? Number(v.openingStock) : 0;
-          const open = snapOpen > 0 ? snapOpen : prevClose;
+          const snapOpen = v.openingStock !== undefined ? Number(v.openingStock) : undefined;
+          const open = snapOpen !== undefined ? snapOpen : prevClose;
           const inflow = Number(v.factoryReceived || 0);
           const sold = Number(v.soldQty || 0);
-          const close = Math.max(0, open + inflow - sold);
+          const close = v.closingStock !== undefined ? Number(v.closingStock) : Math.max(0, open + inflow - sold);
           runningClosingStockByProduct.set(v.productId, close);
         }
       }
@@ -195,12 +195,10 @@ export class ReportsService {
       const priorClosing = runningClosingStockByProduct.get(p.id);
       const snapOpen = snapshotVariant?.openingStock !== undefined ? Number(snapshotVariant.openingStock) : undefined;
 
-      if (snapOpen !== undefined && snapOpen > 0) {
+      if (snapOpen !== undefined) {
         openingStock = snapOpen;
       } else if (priorClosing !== undefined && priorClosing >= 0) {
         openingStock = priorClosing;
-      } else if (snapOpen !== undefined) {
-        openingStock = snapOpen;
       } else if (day >= todayStr) {
         openingStock = Math.max(0, p.stock - factoryReceived + orderSold);
       } else {
@@ -217,8 +215,10 @@ export class ReportsService {
       const autoPackQty = snapshotVariant?.autoPackQty !== undefined ? Number(snapshotVariant.autoPackQty) : (orderAgg?.autoPackQty || 0);
 
       // Remaining / Closing stock:
-      // Opening + Factory Inflow - Sold
-      let remainingPack = Math.max(0, openingStock + recordedFactoryInflow - packQty);
+      // Respect explicit closingStock if saved in snapshot, else Opening + Inflow - Sold
+      let remainingPack = snapshotVariant?.closingStock !== undefined
+        ? Number(snapshotVariant.closingStock)
+        : Math.max(0, openingStock + recordedFactoryInflow - packQty);
 
       // Pricing
       const sellingPrice = snapshotVariant?.sellingPrice !== undefined ? Number(snapshotVariant.sellingPrice) : (orderAgg && orderAgg.packQty > 0 ? orderAgg.salesAmount / orderAgg.packQty : Number(p.price));
