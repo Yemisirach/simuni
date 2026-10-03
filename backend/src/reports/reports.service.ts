@@ -3,6 +3,20 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type SalesSource = 'manual' | 'auto';
 
+export interface WarehouseReserveItem {
+  productId: string;
+  variant: string;
+  sku: string | null;
+  unit: string;
+  prevPrice: number;
+  prevStock: number;
+  newPrice: number;
+  newStock: number;
+  totalWarehouseStock: number;
+  vanRemaining: number;
+  totalAvailableStock: number;
+}
+
 export interface VariantSalesRow {
   productId: string;
   variant: string;
@@ -267,6 +281,83 @@ export class ReportsService {
 
     const orderIds = new Set(items.map((item) => item.order.id));
 
+    // 8. Compute Warehouse available product reserves (New vs Previous price) up to active day
+    // Factory purchase history by variant:
+    // 0.35L: 0 prev (172 ETB), 0 new (220 ETB)
+    // 0.60L: 450 pk @ 220 ETB (Prev), Orders 3 & 5: 370 pk @ 270 ETB (New)
+    // 1.00L: 500 pk @ 174 ETB (Prev), Order 5: 150 pk @ 220 ETB (New)
+    // 2.00L: 420 pk @ 220 ETB (Prev), Order 3, 4 & 5: 680 pk @ 270 ETB (New)
+    const allSnapshotDates = Object.keys(snapshots)
+      .filter((d) => d <= day)
+      .sort();
+
+    // Cumulative sold packs up to this active day
+    const cumulativeSoldMap = new Map<string, number>();
+    for (const d of allSnapshotDates) {
+      const snap = snapshots[d];
+      if (Array.isArray(snap?.variants)) {
+        for (const v of snap.variants) {
+          if (!v.productId) continue;
+          const cur = cumulativeSoldMap.get(v.productId) || 0;
+          cumulativeSoldMap.set(v.productId, cur + Number(v.soldQty || 0));
+        }
+      }
+    }
+
+    const warehouseReserves: WarehouseReserveItem[] = allProducts.map((p) => {
+      const name = (p.name || '').toLowerCase();
+      const variantRow = variants.find((v) => v.productId === p.id);
+      const vanRemaining = variantRow ? variantRow.remainingPack : 0;
+      const cumSold = cumulativeSoldMap.get(p.id) || 0;
+
+      let prevBuy = 220;
+      let newBuy = 270;
+      let totalPrevPurchased = 0;
+      let totalNewPurchased = 0;
+
+      if (name.includes('0.35')) {
+        prevBuy = 172;
+        newBuy = 220;
+        totalPrevPurchased = 0;
+        totalNewPurchased = 0;
+      } else if (name.includes('0.6')) {
+        prevBuy = 220;
+        newBuy = 270;
+        totalPrevPurchased = 450;
+        totalNewPurchased = day >= '2026-10-02' ? 370 : (day >= '2026-09-30' ? 170 : 0);
+      } else if (name.includes('1') && !name.includes('0.35') && !name.includes('0.6')) {
+        prevBuy = 174;
+        newBuy = 220;
+        totalPrevPurchased = 500;
+        totalNewPurchased = day >= '2026-10-02' ? 150 : 0;
+      } else if (name.includes('2')) {
+        prevBuy = 220;
+        newBuy = 270;
+        totalPrevPurchased = 420;
+        totalNewPurchased = day >= '2026-10-02' ? 680 : (day >= '2026-10-01' ? 430 : (day >= '2026-09-30' ? 180 : 0));
+      }
+
+      // FIFO calculation: previous price stock sold first, remaining comes from new price stock
+      const remainingPrevStock = Math.max(0, totalPrevPurchased - cumSold);
+      const soldFromNew = Math.max(0, cumSold - totalPrevPurchased);
+      const remainingNewStock = Math.max(0, totalNewPurchased - soldFromNew);
+      const totalWarehouseStock = remainingPrevStock + remainingNewStock;
+
+      return {
+        productId: p.id,
+        variant: p.name,
+        sku: p.sku,
+        unit: p.unit,
+        prevPrice: prevBuy,
+        prevStock: remainingPrevStock,
+        newPrice: newBuy,
+        newStock: remainingNewStock,
+        totalWarehouseStock,
+        vanRemaining,
+        totalAvailableStock: totalWarehouseStock + vanRemaining,
+      };
+    });
+
     return {
       date: day,
       range: { start: start.toISOString(), end: end.toISOString() },
@@ -301,6 +392,7 @@ export class ReportsService {
         },
       },
       variants,
+      warehouseReserves,
     };
   }
 
