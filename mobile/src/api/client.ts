@@ -215,6 +215,8 @@ export const api = {
     }),
   previousDailySalesReport: (date?: string) =>
     rawRequest(`/reports/daily-sales/previous${date ? `?date=${encodeURIComponent(date)}` : ''}`),
+  weeklyFinanceReport: (startDate?: string, endDate?: string) =>
+    rawRequest(`/reports/weekly-finance?startDate=${encodeURIComponent(startDate || '2026-09-28')}&endDate=${encodeURIComponent(endDate || '2026-10-02')}`),
 };
 
 export const fetchApi = rawRequest;

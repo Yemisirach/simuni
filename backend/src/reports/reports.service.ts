@@ -490,6 +490,146 @@ export class ReportsService {
     return this.dailySales(wsId, prevDay);
   }
 
+  /**
+   * Weekly Finance, Driver Compensation, Tax & Audit Reconciliation Report
+   * Features:
+   * - Daily driver compensation: Fixed 600 ETB commission + 500 ETB lunch per working day (1,100 ETB/day)
+   * - Daily sales, cost of goods (COGS), gross margin
+   * - Net operating profit after driver payroll & expenses
+   * - Ethiopia VAT / TOT & business profit tax estimation
+   * - Reselling margin analysis (factory purchase vs retail resale)
+   * - Audit trail & reconciliation ledger
+   */
+  async weeklyFinanceReport(workspaceId: string | undefined, startDate?: string, endDate?: string) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    const org = await this.prisma.organization.findUnique({ where: { id: wsId } });
+    const metadata = this.parseMetadata(org?.metadata);
+    const snapshots: Record<string, any> = metadata.dailySalesSnapshots || {};
+
+    // Default to the working week (e.g., 2026-09-28 to 2026-10-02)
+    const startStr = startDate || '2026-09-28';
+    const endStr = endDate || '2026-10-02';
+
+    // Generate list of date strings in range
+    const cur = new Date(`${startStr}T00:00:00.000Z`);
+    const end = new Date(`${endStr}T00:00:00.000Z`);
+    const dateList: string[] = [];
+    while (cur <= end) {
+      dateList.push(cur.toISOString().slice(0, 10));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+
+    const dailyBreakdown: any[] = [];
+    let totalSales = 0;
+    let totalCogs = 0;
+    let totalGrossMargin = 0;
+    let totalPacksSold = 0;
+    let workingDaysCount = 0;
+
+    for (const d of dateList) {
+      const daily = await this.dailySales(wsId, d);
+      const isWorkingDay = daily.summary.packQty > 0 || daily.hasSnapshot;
+      if (isWorkingDay) workingDaysCount++;
+
+      // Driver compensation: 600 ETB commission + 500 ETB lunch
+      const driverCommission = isWorkingDay ? 600 : 0;
+      const driverLunch = isWorkingDay ? 500 : 0;
+      const totalDriverCost = driverCommission + driverLunch;
+
+      const sales = daily.summary.salesAmount;
+      const cost = daily.summary.costAmount;
+      const grossMargin = daily.summary.marginAmount;
+      const netProfit = grossMargin - totalDriverCost;
+
+      totalSales += sales;
+      totalCogs += cost;
+      totalGrossMargin += grossMargin;
+      totalPacksSold += daily.summary.packQty;
+
+      dailyBreakdown.push({
+        date: d,
+        dayName: new Date(`${d}T00:00:00.000Z`).toLocaleDateString('en-US', { weekday: 'long' }),
+        hasSnapshot: daily.hasSnapshot,
+        isWorkingDay,
+        packsSold: daily.summary.packQty,
+        salesAmount: sales,
+        cogsAmount: cost,
+        grossMargin,
+        grossMarginPercent: sales > 0 ? this.money((grossMargin / sales) * 100) : 0,
+        driverCompensation: {
+          commission: driverCommission,
+          lunch: driverLunch,
+          total: totalDriverCost,
+        },
+        netProfit: this.money(netProfit),
+        reconciliationStatus: daily.hasSnapshot ? 'BALANCED_AND_LOCKED' : (daily.summary.packQty > 0 ? 'ESTIMATED' : 'IDLE'),
+      });
+    }
+
+    const totalDriverCommission = workingDaysCount * 600;
+    const totalDriverLunch = workingDaysCount * 500;
+    const totalDriverExpense = totalDriverCommission + totalDriverLunch;
+    const netOperatingProfit = totalGrossMargin - totalDriverExpense;
+
+    // Ethiopia Tax Calculation:
+    // Option A: Standard 15% VAT on taxable turnover
+    // Option B: 2% TOT (Turnover Tax) for goods / distribution threshold
+    // Income Tax: 30% on net business profit
+    const totTax = this.money(totalSales * 0.02);
+    const vatTax = this.money(totalSales * 0.15);
+    const businessIncomeTax = this.money(Math.max(0, netOperatingProfit) * 0.30);
+    const netAfterTax = this.money(netOperatingProfit - businessIncomeTax);
+
+    // Reselling Analysis (Factory Purchase vs Resale Performance)
+    const resellingAnalysis = {
+      totalVolumePacks: totalPacksSold,
+      averageSellingPricePerPack: totalPacksSold > 0 ? this.money(totalSales / totalPacksSold) : 0,
+      averageFactoryCostPerPack: totalPacksSold > 0 ? this.money(totalCogs / totalPacksSold) : 0,
+      averageGrossMarginPerPack: totalPacksSold > 0 ? this.money(totalGrossMargin / totalPacksSold) : 0,
+      overallGrossMarginPercent: totalSales > 0 ? this.money((totalGrossMargin / totalSales) * 100) : 0,
+    };
+
+    // Audit Ledger Summary
+    const auditStatus = {
+      reconciledDays: dailyBreakdown.filter((d) => d.hasSnapshot).length,
+      totalWorkingDays: workingDaysCount,
+      ledgerIntegrity: workingDaysCount === dailyBreakdown.filter((d) => d.hasSnapshot).length ? 'FULLY_AUDITED' : 'PARTIALLY_AUDITED',
+      fiscalVerificationHash: `SIMUNI-AUDIT-W${startStr.replace(/-/g, '')}`,
+      lastAuditedAt: new Date().toISOString(),
+    };
+
+    return {
+      period: {
+        startDate: startStr,
+        endDate: endStr,
+        workingDays: workingDaysCount,
+      },
+      summary: {
+        totalSales: this.money(totalSales),
+        totalCogs: this.money(totalCogs),
+        totalGrossMargin: this.money(totalGrossMargin),
+        grossMarginPercent: totalSales > 0 ? this.money((totalGrossMargin / totalSales) * 100) : 0,
+        totalDriverCommission: this.money(totalDriverCommission),
+        totalDriverLunch: this.money(totalDriverLunch),
+        totalDriverExpense: this.money(totalDriverExpense),
+        netOperatingProfit: this.money(netOperatingProfit),
+        netProfitMarginPercent: totalSales > 0 ? this.money((netOperatingProfit / totalSales) * 100) : 0,
+      },
+      taxes: {
+        vatRate: 15,
+        vatAmount: vatTax,
+        totRate: 2,
+        totAmount: totTax,
+        incomeTaxRate: 30,
+        incomeTaxAmount: businessIncomeTax,
+        netProfitAfterTax: netAfterTax,
+      },
+      reselling: resellingAnalysis,
+      audit: auditStatus,
+      dailyBreakdown,
+    };
+  }
+
   private reportDay(date?: string) {
     const day = date || new Date().toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {

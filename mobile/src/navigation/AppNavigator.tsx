@@ -12,6 +12,7 @@ import DeliveryConfirmScreen from '../screens/DeliveryConfirmScreen';
 import InvoiceScreen from '../screens/InvoiceScreen';
 import InvoiceListScreen from '../screens/InvoiceListScreen';
 import IngestScreen from '../screens/IngestScreen';
+import FinanceScreen from '../screens/FinanceScreen';
 import HubScreen from '../screens/HubScreen';
 import FactoryOrdersScreen from '../screens/FactoryOrdersScreen';
 
@@ -90,6 +91,7 @@ function MainTabNavigator() {
           else if (route.name === 'Invoices') emoji = '\u{1F9FE}';
           else if (route.name === 'Survey') emoji = '\u{1F4CD}';
           else if (route.name === 'Ingest') emoji = '\u{1F4E5}';
+          else if (route.name === 'Finance') emoji = '\u{1F4B0}';
           else if (route.name === 'Hub') emoji = '\u{1F4E1}';
           else if (route.name === 'Factory') emoji = '\u{1F3ED}';
           return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
@@ -102,6 +104,7 @@ function MainTabNavigator() {
       <Tab.Screen name="Survey" component={FieldSurveyScreen} />
       <Tab.Screen name="Invoices" component={InvoiceListScreen} />
       <Tab.Screen name="Ingest" component={IngestScreen} options={{ tabBarLabel: 'Daily Sales' }} />
+      <Tab.Screen name="Finance" component={FinanceScreen} options={{ tabBarLabel: 'Finance & Tax' }} />
       <Tab.Screen name="Hub" component={HubScreen} />
       <Tab.Screen name="Factory" component={FactoryOrdersScreen} />
     </Tab.Navigator>

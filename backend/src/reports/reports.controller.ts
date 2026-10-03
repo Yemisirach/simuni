@@ -25,4 +25,13 @@ export class ReportsController {
   getPreviousReport(@CurrentUser() user: any, @Query('date') date?: string) {
     return this.reportsService.getPreviousReport(user?.workspaceId, date);
   }
+
+  @Get('weekly-finance')
+  weeklyFinance(
+    @CurrentUser() user: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.weeklyFinanceReport(user?.workspaceId, startDate, endDate);
+  }
 }
