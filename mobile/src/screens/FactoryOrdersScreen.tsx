@@ -250,6 +250,12 @@ export default function FactoryOrdersScreen() {
   const totalRetail = cart.reduce((sum, item) => sum + item.quantity * (item.retailPrice || item.buyPrice), 0);
   const projectedProfit = totalRetail - totalBudget;
 
+  const totalPastPurchases = history.reduce((sum, order) => sum + Number(order.totalBudget || 0), 0);
+  const totalPastPacks = history.reduce(
+    (sum, order) => sum + (order.items?.reduce((iSum: number, item: any) => iSum + Number(item.quantity || 0), 0) || 0),
+    0,
+  );
+
   const submitOrder = async () => {
     if (cart.length === 0) return;
     if (balance < totalBudget) {
@@ -637,7 +643,20 @@ export default function FactoryOrdersScreen() {
 
       {/* 5. PAST FACTORY ORDERS HISTORY */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Past Factory Purchases</Text>
+        <View style={styles.pastPurchasesHeaderRow}>
+          <View>
+            <Text style={styles.cardTitle}>Past Factory Purchases</Text>
+            <Text style={styles.cardSubtitle}>
+              {history.length} order{history.length === 1 ? '' : 's'} recorded · {totalPastPacks.toLocaleString()} packs loaded
+            </Text>
+          </View>
+          <View style={styles.pastPurchasesTotalBadge}>
+            <Text style={styles.pastPurchasesTotalLabel}>TOTAL</Text>
+            <Text style={styles.pastPurchasesTotalValue}>
+              {totalPastPurchases.toLocaleString()} ETB
+            </Text>
+          </View>
+        </View>
         {history.map((order) => (
           <View key={order.id} style={styles.historyCard}>
             <View style={styles.historyHeader}>
@@ -1118,5 +1137,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#991B1B',
+  },
+
+  // Past Purchases Header & Total Badge
+  pastPurchasesHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: neutral[200],
+  },
+  pastPurchasesTotalBadge: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#D97706',
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignItems: 'flex-end',
+    ...shadows.sm,
+  },
+  pastPurchasesTotalLabel: {
+    fontFamily: fontFamily.sans,
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#92400E',
+    letterSpacing: 0.5,
+  },
+  pastPurchasesTotalValue: {
+    fontFamily: fontFamily.mono,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#78350F',
   },
 });
