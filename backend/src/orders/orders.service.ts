@@ -151,6 +151,62 @@ export class OrdersService {
     return this.prisma.order.update({ where: { id }, data: { status: 'CONFIRMED' } });
   }
 
+  async deleteOrder(workspaceId: string | undefined, id: string) {
+    console.log(`[OrdersService] Deleting order ${id} for workspace ${workspaceId}`);
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    console.log(`[OrdersService] Resolved workspaceId: ${wsId}`);
+    const order = await this.findOne(wsId, id);
+    console.log(`[OrdersService] Found order to delete: ${order.id}. Deleting sequentially without interactive transaction...`);
+
+    // 1. Delete associated payments if an invoice exists
+    if (order.invoice?.id) {
+      console.log(`[OrdersService] Deleting payments & invoice: ${order.invoice.id}`);
+      await this.prisma.payment.deleteMany({
+        where: { invoiceId: order.invoice.id },
+      });
+      await this.prisma.invoice.delete({
+        where: { id: order.invoice.id },
+      });
+    }
+
+    // 2. Delete delivery if exists
+    if (order.delivery?.id) {
+      console.log(`[OrdersService] Deleting delivery: ${order.delivery.id}`);
+      await this.prisma.delivery.delete({
+        where: { id: order.delivery.id },
+      });
+    }
+
+    // 3. Delete order items & revert stock if needed
+    console.log(`[OrdersService] Deleting order items count: ${order.items.length}`);
+    for (const item of order.items) {
+      await this.prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: item.quantity } },
+      }).catch((e) => console.log('Error reverting stock:', e.message));
+    }
+    await this.prisma.orderItem.deleteMany({
+      where: { orderId: id },
+    });
+
+    // 4. Delete the order
+    console.log(`[OrdersService] Deleting order row: ${id}`);
+    await this.prisma.order.delete({
+      where: { id },
+    });
+
+    // 5. Delete customer if it was an auto-created spot sale shop
+    if (order.customer && order.customer.name.startsWith('Spot Sale') && order.customer.phone === 'N/A') {
+      console.log(`[OrdersService] Deleting spot customer: ${order.customer.id}`);
+      await this.prisma.customer.delete({
+        where: { id: order.customer.id },
+      }).catch(() => {});
+    }
+
+    console.log(`[OrdersService] Order ${id} successfully deleted!`);
+    return { success: true, message: `Order ${id} deleted successfully.` };
+  }
+
   orderTotal(order: { items: { price: any; quantity: number }[] }) {
     return order.items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
   }

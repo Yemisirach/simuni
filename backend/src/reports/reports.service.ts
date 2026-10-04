@@ -319,12 +319,12 @@ export class ReportsService {
         prevBuy = 172;
         newBuy = 220;
         totalPrevPurchased = 0;
-        totalNewPurchased = 0;
+        totalNewPurchased = day >= '2026-10-03' ? 250 : 0;
       } else if (name.includes('0.6')) {
         prevBuy = 220;
         newBuy = 270;
         totalPrevPurchased = 450;
-        totalNewPurchased = day >= '2026-10-02' ? 370 : (day >= '2026-09-30' ? 170 : 0);
+        totalNewPurchased = day >= '2026-10-03' ? 470 : (day >= '2026-10-02' ? 370 : (day >= '2026-09-30' ? 170 : 0));
       } else if (name.includes('1') && !name.includes('0.35') && !name.includes('0.6')) {
         prevBuy = 174;
         newBuy = 220;
@@ -334,14 +334,26 @@ export class ReportsService {
         prevBuy = 220;
         newBuy = 270;
         totalPrevPurchased = 420;
-        totalNewPurchased = day >= '2026-10-02' ? 680 : (day >= '2026-10-01' ? 430 : (day >= '2026-09-30' ? 180 : 0));
+        // Total factory orders for 2.00L:
+        // Mon-Tue (prev): 170 + 250 = 420
+        // Wed: +400 (PO #3)
+        // Thu: +250 (PO #4) -> 650
+        // Fri: +250 (PO #5) -> 900
+        // Sat/Oct 3+: +300 (PO #6) -> 1200
+        totalNewPurchased = day >= '2026-10-03' ? 1200 : (day >= '2026-10-02' ? 900 : (day >= '2026-10-01' ? 650 : (day >= '2026-09-30' ? 400 : 0)));
       }
 
-      // FIFO calculation: previous price stock sold first, remaining comes from new price stock
-      const remainingPrevStock = Math.max(0, totalPrevPurchased - cumSold);
-      const soldFromNew = Math.max(0, cumSold - totalPrevPurchased);
-      const remainingNewStock = Math.max(0, totalNewPurchased - soldFromNew);
-      const totalWarehouseStock = remainingPrevStock + remainingNewStock;
+      // Total available inventory across business = Total purchased - Total sold
+      const totalAvailable = Math.max(0, (totalPrevPurchased + totalNewPurchased) - cumSold);
+
+      // Store stock is the quantity physically in the store warehouse (outside the active delivery van)
+      // When vanRemaining is present, store stock = totalAvailable - vanRemaining
+      const storeStock = Math.max(0, totalAvailable - vanRemaining);
+
+      // FIFO breakdown for Store Stock:
+      // Cumulative loaded onto van or sold comes first from prevBuy, then newBuy
+      const remainingPrevStock = Math.min(storeStock, Math.max(0, totalPrevPurchased - cumSold));
+      const remainingNewStock = Math.max(0, storeStock - remainingPrevStock);
 
       return {
         productId: p.id,
@@ -352,9 +364,9 @@ export class ReportsService {
         prevStock: remainingPrevStock,
         newPrice: newBuy,
         newStock: remainingNewStock,
-        totalWarehouseStock,
+        totalWarehouseStock: storeStock,
         vanRemaining,
-        totalAvailableStock: totalWarehouseStock + vanRemaining,
+        totalAvailableStock: totalAvailable,
       };
     });
 

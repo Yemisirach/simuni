@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -31,5 +31,10 @@ export class OrdersController {
   @Patch(':id/confirm')
   confirm(@CurrentUser() user, @Param('id') id: string) {
     return this.ordersService.confirm(user.workspaceId, id);
+  }
+
+  @Delete(':id')
+  delete(@CurrentUser() user, @Param('id') id: string) {
+    return this.ordersService.deleteOrder(user?.workspaceId, id);
   }
 }
