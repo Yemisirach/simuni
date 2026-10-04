@@ -16,6 +16,16 @@ export class FactoryOrdersController {
     return this.factoryOrdersService.topUp(user.workspaceId, body.amount);
   }
 
+  @Post('reverse-topup')
+  reverseTopUp(@CurrentUser() user, @Body() body: { amount: number }) {
+    return this.factoryOrdersService.reverseTopUp(user.workspaceId, body.amount);
+  }
+
+  @Post('set-balance')
+  setBalance(@CurrentUser() user, @Body() body: { balance: number }) {
+    return this.factoryOrdersService.setBalance(user.workspaceId, body.balance);
+  }
+
   @Post()
   create(@CurrentUser() user, @Body() createFactoryOrderDto: any) {
     return this.factoryOrdersService.create(user.workspaceId, createFactoryOrderDto);

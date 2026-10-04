@@ -47,6 +47,60 @@ export class FactoryOrdersService {
     });
   }
 
+  async reverseTopUp(workspaceId: string, amount: number) {
+    if (amount <= 0) throw new BadRequestException('Amount must be positive');
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+
+    return this.prisma.$transaction(async (tx) => {
+      const org = await tx.organization.findUnique({ where: { id: wsId } });
+      if (!org) throw new NotFoundException('Organization not found');
+
+      const currentBalance = Number(org.factoryBalance || 0);
+      const newBalance = Math.max(0, currentBalance - Number(amount));
+
+      await tx.organization.update({
+        where: { id: wsId },
+        data: { factoryBalance: newBalance }
+      });
+
+      // Find the most recent matching top up transaction if exists and mark or delete it
+      const recentTx = await tx.factoryTransaction.findFirst({
+        where: {
+          workspaceId: wsId,
+          type: 'TOP_UP',
+          amount: amount,
+        },
+        orderBy: { date: 'desc' },
+      });
+
+      if (recentTx) {
+        await tx.factoryTransaction.delete({
+          where: { id: recentTx.id }
+        });
+      } else {
+        await tx.factoryTransaction.create({
+          data: {
+            workspaceId: wsId,
+            type: 'REVERSAL',
+            amount,
+            balanceAfter: newBalance,
+          }
+        });
+      }
+
+      return { balance: newBalance, reversed: amount, previousBalance: currentBalance };
+    });
+  }
+
+  async setBalance(workspaceId: string, balance: number) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    await this.prisma.organization.update({
+      where: { id: wsId },
+      data: { factoryBalance: Math.max(0, balance) }
+    });
+    return { balance: Math.max(0, balance) };
+  }
+
   async create(workspaceId: string, data: any) {
     const totalBudget = data.items.reduce((sum, item) => sum + (item.quantity * item.buyPrice), 0);
     const wsId = await this.resolveWorkspaceId(workspaceId);

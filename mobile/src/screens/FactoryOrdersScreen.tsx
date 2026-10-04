@@ -224,6 +224,28 @@ export default function FactoryOrdersScreen() {
     }
   };
 
+  const handleReverseTopUp = async (amt?: number) => {
+    const amountToReverse = amt || Number(topUpAmount);
+    if (!amountToReverse || amountToReverse <= 0) {
+      Alert.alert('Invalid amount', 'Enter or select the amount you wish to remove/reverse.');
+      return;
+    }
+    try {
+      const res: any = await rawRequest('/factory-orders/reverse-topup', {
+        method: 'POST',
+        body: JSON.stringify({ amount: amountToReverse }),
+      });
+      setTopUpAmount('');
+      loadData();
+      Alert.alert(
+        'Top-up Removed ✓',
+        `Successfully removed ${amountToReverse.toLocaleString()} ETB from ledger balance. Current balance: ${Number(res?.balance || 0).toLocaleString()} ETB.`,
+      );
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to reverse top up amount.');
+    }
+  };
+
   const totalBudget = cart.reduce((sum, item) => sum + item.quantity * item.buyPrice, 0);
   const totalRetail = cart.reduce((sum, item) => sum + item.quantity * (item.retailPrice || item.buyPrice), 0);
   const projectedProfit = totalRetail - totalBudget;
@@ -284,7 +306,7 @@ export default function FactoryOrdersScreen() {
         <View style={styles.topUpRow}>
           <TextInput
             style={styles.topUpInput}
-            placeholder="Top up amount (ETB)"
+            placeholder="Amount (e.g. 150000)"
             keyboardType="numeric"
             value={topUpAmount}
             onChangeText={setTopUpAmount}
@@ -292,6 +314,25 @@ export default function FactoryOrdersScreen() {
           />
           <TouchableOpacity style={styles.topUpButton} onPress={handleTopUp}>
             <Text style={styles.topUpButtonText}>+ Top Up</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.topUpButton, { backgroundColor: '#DC2626' }]}
+            onPress={() => handleReverseTopUp()}
+          >
+            <Text style={styles.topUpButtonText}>- Remove</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Reversal Pill for accidental top up */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+          <Text style={{ fontSize: 11, color: neutral[500], fontFamily: fontFamily.sans }}>
+            Accidental top-up?
+          </Text>
+          <TouchableOpacity
+            style={styles.accidentalPill}
+            onPress={() => handleReverseTopUp(150000)}
+          >
+            <Text style={styles.accidentalPillText}>↺ Remove accidental 150,000 ETB</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1063,5 +1104,19 @@ const styles = StyleSheet.create({
     color: brand.black,
     textAlign: 'right',
     marginTop: 4,
+  },
+  accidentalPill: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#F87171',
+    borderRadius: radius.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  accidentalPillText: {
+    fontFamily: fontFamily.sans,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#991B1B',
   },
 });
