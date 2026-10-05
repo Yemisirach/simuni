@@ -13,6 +13,12 @@ export class CreateProductDto {
   @IsNumber() @Min(0)
   price: number;
 
+  @IsOptional() @IsNumber() @Min(0)
+  factoryPrice?: number;
+
+  @IsOptional() @IsNumber()
+  stock?: number;
+
   @IsOptional()
   isActive?: boolean;
 }
