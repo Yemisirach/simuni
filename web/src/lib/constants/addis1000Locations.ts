@@ -23,10 +23,10 @@ const ZONE_ANCHORS: ZoneAnchor[] = [
     zone: 'Yeka Abado Condominium & Core Blocks',
     subCity: 'Yeka',
     sector: 'YEKA',
-    centerLat: 9.0645,
-    centerLng: 38.8655,
-    latSpan: 0.022,
-    lngSpan: 0.025,
+    centerLat: 9.0350,
+    centerLng: 38.8450,
+    latSpan: 0.035,
+    lngSpan: 0.040,
     types: [
       {
         type: 'RETAILER',
@@ -302,6 +302,11 @@ export function generateComprehensiveAddisLocations(targetCount = 2500): AddisLo
   const result: AddisLocationPreset[] = [...ADDIS_ABABA_TAGGED_LOCATIONS];
   let counter = 1;
 
+  // Martin Roberts R2 low-discrepancy 2D quasi-random sequence (optimal 2D planar scatter)
+  // Guarantees uniform 2D distribution across both latitude and longitude without clustering, grids, or straight lines.
+  const phi1 = 0.7548776662466927; // 1 / plastic constant
+  const phi2 = 0.5698402909980532; // 1 / (plastic constant ^ 2)
+
   while (result.length < targetCount) {
     for (const anchor of ZONE_ANCHORS) {
       if (result.length >= targetCount) break;
@@ -314,13 +319,21 @@ export function generateComprehensiveAddisLocations(targetCount = 2500): AddisLo
         const unitNumber = ((counter * 17) % 120) + 1;
         const name = `${prefix} ${suffix} #${unitNumber}`;
 
-        // Deterministic offset spread within the geographical zone
-        const angle = ((counter * 47) % 360) * (Math.PI / 180);
-        const radiusLat = Math.sin(counter * 3.14159) * (anchor.latSpan / 2);
-        const radiusLng = Math.cos(counter * 2.71828) * (anchor.lngSpan / 2);
+        // True 2D planar dispersion across the anchor zone
+        const u = (((counter * phi1) % 1) - 0.5) * 0.94; // [-0.47, 0.47]
+        const v = (((counter * phi2) % 1) - 0.5) * 0.94; // [-0.47, 0.47]
 
-        const lat = Number((anchor.centerLat + radiusLat).toFixed(6));
-        const lng = Number((anchor.centerLng + radiusLng).toFixed(6));
+        // Organic micro-scatter to replicate authentic street/block offsets
+        const jitterAngle = ((counter * 137.5) % 360) * (Math.PI / 180);
+        const jitterR = (((counter * 23) % 100) / 100) * 0.05;
+        const jLat = Math.sin(jitterAngle) * jitterR;
+        const jLng = Math.cos(jitterAngle) * jitterR;
+
+        const offsetLat = (u + jLat) * anchor.latSpan;
+        const offsetLng = (v + jLng) * anchor.lngSpan;
+
+        const lat = Number((anchor.centerLat + offsetLat).toFixed(6));
+        const lng = Number((anchor.centerLng + offsetLng).toFixed(6));
 
         result.push({
           id: `addis-poi-${counter.toString().padStart(5, '0')}`,

@@ -192,8 +192,8 @@ export class CustomersService {
             },
           });
           createdCount++;
-        } else if (existing.lat == null || existing.lng == null) {
-          // Update missing coordinates
+        } else {
+          // Update coordinates to authentic 2D dispersed positions
           await this.prisma.customer.update({
             where: { id: existing.id },
             data: { lat: loc.lat, lng: loc.lng, address: loc.address || existing.address },

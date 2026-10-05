@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Rectangle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -39,14 +39,44 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-// Custom DivIcon generator to provide high contrast over both satellite and street view
-function createMarkerIcon(isSelected: boolean, orderNumber?: number) {
+// Adaptive Marker Icon generator that scales based on zoom level
+function createMarkerIcon(isSelected: boolean, orderNumber?: number, zoom = 14, category?: string) {
+  let size = 26;
+  let fontSize = 11;
+  let borderWidth = 2;
+
+  if (zoom < 13) {
+    // City overview: micro dot
+    size = isSelected ? 22 : 14;
+    fontSize = 9;
+    borderWidth = 1.5;
+  } else if (zoom < 15) {
+    // District / Corridor level: compact badge
+    size = isSelected ? 28 : 22;
+    fontSize = 11;
+    borderWidth = 2;
+  } else if (zoom < 17) {
+    // Neighborhood level: standard badge
+    size = isSelected ? 32 : 28;
+    fontSize = 12;
+    borderWidth = 2.5;
+  } else {
+    // Street / Block level: high-detail badge
+    size = isSelected ? 36 : 30;
+    fontSize = 13;
+    borderWidth = 3;
+  }
+
+  const iconSymbol = isSelected
+    ? (orderNumber !== undefined ? `${orderNumber}` : '✓')
+    : (zoom < 13 ? '' : (category === 'Supermarket' || category === 'Wholesale' ? '🏬' : '📍'));
+
   return L.divIcon({
     className: 'custom-stop-pin',
     html: `
       <div style="
-        width: 32px;
-        height: 32px;
+        width: ${size}px;
+        height: ${size}px;
         border-radius: 50%;
         background-color: ${isSelected ? '#C4A35A' : '#1A1D20'};
         color: ${isSelected ? '#1A1A1A' : '#FFFFFF'};
@@ -54,44 +84,71 @@ function createMarkerIcon(isSelected: boolean, orderNumber?: number) {
         align-items: center;
         justify-content: center;
         font-weight: 800;
-        font-size: 13px;
-        border: 2.5px solid ${isSelected ? '#FFFFFF' : '#C4A35A'};
-        box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+        font-size: ${fontSize}px;
+        border: ${borderWidth}px solid ${isSelected ? '#FFFFFF' : '#C4A35A'};
+        box-shadow: 0 3px 8px rgba(0,0,0,0.55);
         cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        transform: ${isSelected ? 'scale(1.2)' : 'scale(1.0)'};
+        transition: transform 0.15s ease, background-color 0.2s ease;
+        transform: ${isSelected ? 'scale(1.15)' : 'scale(1.0)'};
       ">
-        ${isSelected ? (orderNumber !== undefined ? `${orderNumber}` : '✓') : '📍'}
+        ${iconSymbol}
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -18],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2 - 2],
   });
 }
 
 function MapEventsHandler({
   selectionTool,
   onMapClick,
+  onViewportChange,
 }: {
   selectionTool: 'PIN' | 'CIRCLE' | 'RECTANGLE';
   onMapClick: (latlng: L.LatLng) => void;
+  onViewportChange: (zoom: number, bounds: L.LatLngBounds) => void;
 }) {
-  useMapEvents({
+  const map = useMapEvents({
     click(e) {
       onMapClick(e.latlng);
     },
+    zoomend() {
+      onViewportChange(map.getZoom(), map.getBounds());
+    },
+    moveend() {
+      onViewportChange(map.getZoom(), map.getBounds());
+    },
   });
+
+  useEffect(() => {
+    onViewportChange(map.getZoom(), map.getBounds());
+  }, [map, onViewportChange]);
+
   return null;
 }
 
-function MapViewController({ target }: { target: { center: [number, number]; zoom: number } | null }) {
+function MapViewController({
+  target,
+  targetZoom,
+}: {
+  target: { center: [number, number]; zoom: number } | null;
+  targetZoom?: number | null;
+}) {
   const map = useMap();
+
   useEffect(() => {
     if (target) {
       map.flyTo(target.center, target.zoom, { duration: 1.0 });
     }
   }, [target, map]);
+
+  useEffect(() => {
+    if (typeof targetZoom === 'number') {
+      map.setZoom(targetZoom);
+    }
+  }, [targetZoom, map]);
+
   return null;
 }
 
@@ -104,6 +161,12 @@ export default function StopSelectionMap({
   // Addis Ababa default center
   const defaultCenter: [number, number] = [9.0227, 38.7469];
   const [viewTarget, setViewTarget] = useState<{ center: [number, number]; zoom: number } | null>(null);
+  const [zoomTarget, setZoomTarget] = useState<number | null>(null);
+
+  // Map state
+  const [currentZoom, setCurrentZoom] = useState<number>(13);
+  const [currentBounds, setCurrentBounds] = useState<L.LatLngBounds | null>(null);
+  const [densityMode, setDensityMode] = useState<'SMART' | 'ALL'>('SMART');
 
   // Map Layer: 'SATELLITE' (default) vs 'STREET'
   const [mapLayer, setMapLayer] = useState<'SATELLITE' | 'STREET'>('SATELLITE');
@@ -126,6 +189,74 @@ export default function StopSelectionMap({
   const validCustomers = useMemo(() => {
     return customers.filter(c => typeof c.lat === 'number' && typeof c.lng === 'number');
   }, [customers]);
+
+  // Viewport change handler
+  const handleViewportChange = useCallback((zoom: number, bounds: L.LatLngBounds) => {
+    setCurrentZoom(zoom);
+    setCurrentBounds(bounds);
+  }, []);
+
+  // Filter and scale pins based on viewport bounds and zoom level ("Scale View")
+  const displayedCustomers = useMemo(() => {
+    if (!currentBounds) {
+      return validCustomers.slice(0, 300);
+    }
+
+    // Pad bounds by 15% so markers outside edge don't abruptly pop in while panning
+    const paddedBounds = currentBounds.pad(0.15);
+
+    const selectedSet = new Set(selectedCustomerIds);
+    const inViewport: CustomerLocation[] = [];
+    const selectedInViewport: CustomerLocation[] = [];
+    const selectedOutsideViewport: CustomerLocation[] = [];
+
+    for (const c of validCustomers) {
+      const isSelected = selectedSet.has(c.id);
+      const inside = paddedBounds.contains([c.lat!, c.lng!]);
+
+      if (isSelected) {
+        if (inside) {
+          selectedInViewport.push(c);
+        } else {
+          selectedOutsideViewport.push(c);
+        }
+      } else if (inside) {
+        inViewport.push(c);
+      }
+    }
+
+    // If densityMode is 'ALL' or zoomed in to neighborhood/street/condo block level (zoom >= 15):
+    // Show 100% of all establishments in the viewport!
+    if (densityMode === 'ALL' || currentZoom >= 15) {
+      return [...selectedOutsideViewport, ...selectedInViewport, ...inViewport];
+    }
+
+    // Smart adaptive scale sampling for lower zoom levels to keep the map legible and high-performance
+    let sampleStride = 1;
+    let maxUnselected = 400;
+
+    if (currentZoom < 13) {
+      // City overview: sample every 5th pin (max 120 pins)
+      sampleStride = 5;
+      maxUnselected = 120;
+    } else if (currentZoom === 13) {
+      // Sub-city level: sample every 3rd pin (max 250 pins)
+      sampleStride = 3;
+      maxUnselected = 250;
+    } else if (currentZoom === 14) {
+      // District / corridor level: sample every 2nd pin (max 400 pins)
+      sampleStride = 2;
+      maxUnselected = 400;
+    }
+
+    const sampledUnselected: CustomerLocation[] = [];
+    for (let i = 0; i < inViewport.length; i += sampleStride) {
+      sampledUnselected.push(inViewport[i]);
+      if (sampledUnselected.length >= maxUnselected) break;
+    }
+
+    return [...selectedOutsideViewport, ...selectedInViewport, ...sampledUnselected];
+  }, [validCustomers, selectedCustomerIds, currentBounds, currentZoom, densityMode]);
 
   // Handle map clicks according to the active tool
   const handleMapClick = (latlng: L.LatLng) => {
@@ -199,6 +330,14 @@ export default function StopSelectionMap({
       [Math.max(rectCorner1[0], rectCorner2[0]), Math.max(rectCorner1[1], rectCorner2[1])],
     ] as L.LatLngBoundsLiteral;
   }, [rectCorner1, rectCorner2]);
+
+  // Current Zoom Scale Description
+  const zoomScaleLabel = useMemo(() => {
+    if (currentZoom < 13) return { tier: 'City Scale', icon: '🌐', detail: 'Overview (Filtered landmarks)' };
+    if (currentZoom < 15) return { tier: 'Corridor Scale', icon: '📍', detail: 'District hubs' };
+    if (currentZoom < 17) return { tier: 'Neighborhood Scale', icon: '🏘️', detail: 'Condos & Sites' };
+    return { tier: 'Street / Block Scale', icon: '🏪', detail: '100% full building & kiosk detail' };
+  }, [currentZoom]);
 
   return (
     <div className="flex flex-col h-full w-full bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
@@ -305,11 +444,11 @@ export default function StopSelectionMap({
             <span className="text-[11px] font-bold text-text-muted mr-0.5">Focus:</span>
             {[
               { name: '📍 Central Addis', center: [ADDIS_ABABA_CENTRAL_LOCATION.lat, ADDIS_ABABA_CENTRAL_LOCATION.lng] as [number, number], zoom: 13 },
-              { name: 'Yeka Abado', center: [9.0255, 38.8150] as [number, number], zoom: 14 },
-              { name: 'Mercato', center: [9.0305, 38.7360] as [number, number], zoom: 14 },
-              { name: 'Bole', center: [8.9950, 38.7880] as [number, number], zoom: 14 },
-              { name: 'Lebu / Jemo', center: [8.9720, 38.7180] as [number, number], zoom: 14 },
-              { name: 'Piazza', center: [9.0352, 38.7518] as [number, number], zoom: 15 },
+              { name: 'Yeka Abado (Full Blocks)', center: [9.0350, 38.8450] as [number, number], zoom: 16 },
+              { name: 'Mercato', center: [9.0305, 38.7360] as [number, number], zoom: 15 },
+              { name: 'Bole', center: [8.9950, 38.7880] as [number, number], zoom: 15 },
+              { name: 'Lebu / Jemo', center: [8.9600, 38.7200] as [number, number], zoom: 15 },
+              { name: 'Piazza', center: [9.0220, 38.7520] as [number, number], zoom: 16 },
             ].map(sec => (
               <button
                 key={sec.name}
@@ -333,13 +472,81 @@ export default function StopSelectionMap({
               defaultValue=""
               className="text-[11px] font-bold text-primary bg-white border border-border rounded px-2 py-1 outline-none hover:border-accent cursor-pointer"
             >
-              <option value="" disabled>Jump to Tagged Location ({ADDIS_ABABA_TAGGED_LOCATIONS.length})...</option>
+              <option value="" disabled>Jump to Landmark ({ADDIS_ABABA_TAGGED_LOCATIONS.length})...</option>
               {ADDIS_ABABA_TAGGED_LOCATIONS.map(loc => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.subCity})
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Scale View & Zoom Density Bar */}
+      <div className="px-3 py-1.5 bg-gradient-to-r from-amber-50/90 to-gray-50 border-b border-border flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Zoom & Scale Badge */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-white border border-amber-300 px-2.5 py-1 rounded-md shadow-xs">
+            <span className="text-sm">{zoomScaleLabel.icon}</span>
+            <span className="font-bold text-primary font-mono">{currentZoom}x Zoom</span>
+            <span className="text-[11px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded">
+              {zoomScaleLabel.tier}
+            </span>
+            <span className="text-[11px] text-text-muted hidden md:inline">({zoomScaleLabel.detail})</span>
+          </div>
+
+          {/* Quick Zoom Presets */}
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-text-muted font-bold mr-0.5">Scale:</span>
+            {[
+              { label: 'City (12x)', zoom: 12 },
+              { label: 'Corridor (14x)', zoom: 14 },
+              { label: 'Neighborhood (16x)', zoom: 16 },
+              { label: 'Block (18x)', zoom: 18 },
+            ].map(p => (
+              <button
+                key={p.zoom}
+                type="button"
+                onClick={() => setZoomTarget(p.zoom)}
+                className={`px-2 py-0.5 text-[11px] rounded font-semibold border transition-all ${
+                  currentZoom === p.zoom
+                    ? 'bg-primary text-white border-primary shadow-xs'
+                    : 'bg-white text-text-muted border-border hover:text-primary hover:bg-gray-100'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Density Mode Switcher */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-text-muted">
+            Rendering <strong>{displayedCustomers.length}</strong> stops in viewport
+          </span>
+          <div className="flex items-center bg-white border border-border rounded-lg p-0.5 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setDensityMode('SMART')}
+              className={`px-2 py-0.5 font-bold rounded ${
+                densityMode === 'SMART' ? 'bg-accent text-primary-darker shadow-xs' : 'text-text-muted hover:text-primary'
+              }`}
+              title="Adaptive scaling based on zoom level"
+            >
+              Smart Scale
+            </button>
+            <button
+              type="button"
+              onClick={() => setDensityMode('ALL')}
+              className={`px-2 py-0.5 font-bold rounded ${
+                densityMode === 'ALL' ? 'bg-accent text-primary-darker shadow-xs' : 'text-text-muted hover:text-primary'
+              }`}
+              title="Show all stops in viewport regardless of zoom"
+            >
+              Show All (100%)
+            </button>
           </div>
         </div>
       </div>
@@ -423,8 +630,12 @@ export default function StopSelectionMap({
             />
           )}
 
-          <MapEventsHandler selectionTool={tool} onMapClick={handleMapClick} />
-          <MapViewController target={viewTarget} />
+          <MapEventsHandler
+            selectionTool={tool}
+            onMapClick={handleMapClick}
+            onViewportChange={handleViewportChange}
+          />
+          <MapViewController target={viewTarget} targetZoom={zoomTarget} />
 
           {/* Render Circle if defined */}
           {circleCenter && (
@@ -464,8 +675,8 @@ export default function StopSelectionMap({
             />
           )}
 
-          {/* Customer Markers */}
-          {validCustomers.map(c => {
+          {/* Customer Markers with Zoom-Adaptive Scaling */}
+          {displayedCustomers.map(c => {
             const isSelected = selectedCustomerIds.includes(c.id);
             const selectedIndex = isSelected ? selectedCustomerIds.indexOf(c.id) + 1 : undefined;
 
@@ -473,7 +684,7 @@ export default function StopSelectionMap({
               <Marker
                 key={c.id}
                 position={[c.lat!, c.lng!]}
-                icon={createMarkerIcon(isSelected, selectedIndex)}
+                icon={createMarkerIcon(isSelected, selectedIndex, currentZoom, c.category || undefined)}
                 eventHandlers={{
                   click: () => {
                     if (tool === 'PIN') {
@@ -483,7 +694,7 @@ export default function StopSelectionMap({
                 }}
               >
                 <Popup>
-                  <div className="font-sans text-xs space-y-1.5 p-1 max-w-[200px]">
+                  <div className="font-sans text-xs space-y-1.5 p-1 max-w-[210px]">
                     <div className="font-bold text-sm text-primary flex items-center justify-between gap-1">
                       <span>{c.name}</span>
                       {c.category && (
@@ -495,7 +706,7 @@ export default function StopSelectionMap({
                     {c.address && <div className="text-text-muted">{c.address}</div>}
                     {c.phone && <div className="font-mono text-text-muted">📞 {c.phone}</div>}
                     <div className="font-mono text-[11px] text-emerald-700">
-                      📍 {c.lat?.toFixed(4)}, {c.lng?.toFixed(4)}
+                      📍 {c.lat?.toFixed(5)}, {c.lng?.toFixed(5)}
                     </div>
                     <button
                       type="button"
@@ -532,7 +743,7 @@ export default function StopSelectionMap({
             onClick={() => onSelectMultiple(validCustomers.map(c => c.id), 'add')}
             className="px-2 py-1 font-bold text-text-muted hover:text-primary underline"
           >
-            Select All
+            Select All ({validCustomers.length})
           </button>
           <button
             type="button"
