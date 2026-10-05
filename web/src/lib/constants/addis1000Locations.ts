@@ -18,198 +18,272 @@ interface ZoneAnchor {
 }
 
 const ZONE_ANCHORS: ZoneAnchor[] = [
-  // 1. Yeka / Abado / Ayat / CMC Corridor
+  // 1. SPECIFIC YEKA ABADO CORE (Blocks, Sites, Condos, Gates, Markets)
   {
-    zone: 'Yeka Abado & Ayat',
+    zone: 'Yeka Abado Condominium & Core Blocks',
     subCity: 'Yeka',
     sector: 'YEKA',
-    centerLat: 9.0255,
-    centerLng: 38.8250,
-    latSpan: 0.045,
-    lngSpan: 0.050,
+    centerLat: 9.0645,
+    centerLng: 38.8655,
+    latSpan: 0.022,
+    lngSpan: 0.025,
     types: [
+      {
+        type: 'RETAILER',
+        defaultCategory: 'Retailer',
+        prefixes: [
+          'Abado Site 1 Block 12', 'Abado Site 1 Block 34', 'Abado Site 2 Block 5', 'Abado Site 2 Block 19',
+          'Abado Site 3 Block 8', 'Abado Site 3 Block 42', 'Abado Site 4 Block 15', 'Abado Site 4 Block 27',
+          'Abado Site 5 Block 3', 'Abado Site 5 Block 31', 'Abado Site 6 Block 11', 'Abado Site 6 Block 50',
+          'Abado Site 7 Block 14', 'Abado Site 8 Block 22', 'Abado Site 9 Block 38', 'Abado Site 10 Block 7',
+          'Abado Site 11 Block 45', 'Abado Site 12 Block 9', 'Abado Site 13 Block 18', 'Abado Site 14 Block 29',
+          'Abado Adebabay G7', 'Abado Meskelenya Junction', 'Abado Asfalt Dama', 'Abado Taxi Station Gate',
+          'Abado Condominium Phase 1', 'Abado Condominium Phase 2', 'Abado Block 88 Corner', 'Abado Block 102 Mart'
+        ],
+        suffixes: ['Mini Mart', 'Beverage Kiosk', 'Retail Shop', 'Provisions Store', 'Soft Drinks Depot', 'Groceries & Water Drop', 'Corner Mart'],
+      },
       {
         type: 'CAFE',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Abado Sunset', 'Selam', 'Ayat View', 'Kotebe Hill', 'Gurd Shola', 'Enat', 'Zelalem', 'Marr', 'Birr', 'Tsehay', 'Meklit', 'Alem'],
-        suffixes: ['Specialty Coffee', 'Roastery & Cafe', 'Pastry & Cafe', 'Bunna Bet', 'Espresso Lounge', 'Tea & Pastry House'],
+        prefixes: [
+          'Abado Morning Sun', 'Selam Abado', 'Bilen Abado', 'Meskelenya View', 'G7 Square', 'Abado Highland',
+          'Enat Bunna', 'Birr Bunna Abado', 'Adebabay Pastry', 'Tsehay Bunna Bet', 'Site 4 Corner', 'Block 19 Lounge',
+          'Abado Breeze', 'Sheger Cup Abado', 'Topwater Oasis Abado', 'Golden Bean Abado'
+        ],
+        suffixes: ['Bunna Bet & Cafe', 'Pastry & Espresso House', 'Specialty Coffee & Tea', 'Traditional Bunna', 'Fast Burger & Cafe', 'Patisserie Lounge'],
       },
       {
         type: 'HOTEL_RESTAURANT',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Yeka Crest', 'Abado Continental', 'Ayat Grand', 'Kotebe Family', 'CMC Royal', 'Green Park', 'Hikma', 'Mubarak', 'Bilen', 'Selam'],
-        suffixes: ['Cultural Restaurant', 'Kitfo & Grill House', 'Kitchen & Lounge', 'Traditional Dining', 'Family Restaurant', 'Burger & Bistro'],
+        prefixes: [
+          'Bilen Kitfo Abado', 'Abado Meskel Grill', 'G7 Adebabay Resto', 'Rufael School Gate', 'City Burgers Abado',
+          'Panago Burgers Abado', 'Abyssinia Feast Abado', 'Abado Family Kitchen', 'Site 2 Traditional Kitfo', 'Hikma Shiro & Tibs',
+          'Mubarak Abado Lounge', 'Abado View Bistro', 'Tsehay Kitchen Abado', 'Adebabay Traditional Grill'
+        ],
+        suffixes: ['Traditional Restaurant', 'Kitfo & Butcher Lounge', 'Burgers & Grill', 'Family Dining & Cafe', 'Bistro & Kitchen', 'Local Eatery & Grocery'],
       },
       {
         type: 'SUPERMARKET',
         defaultCategory: 'Supermarket',
-        prefixes: ['Ayat Zone 2', 'Abado Central', 'CMC Michael', 'Kotebe Meta', 'Gurd Shola', 'Fresh Day', 'Mega', 'Family Care', 'All-Day'],
-        suffixes: ['Supermarket', 'Mart & Provisions', 'Grocery & Beverage', 'Daily Hypermarket', 'Express Mart'],
+        prefixes: [
+          'Abado Central', 'Abado Site 3', 'G7 Adebabay', 'Meskelenya Commercial', 'Abado Block 25',
+          'Abado Express', 'Fresh Day Abado', 'All-Day Abado', 'Green Mart Abado'
+        ],
+        suffixes: ['Supermarket', 'Grocery & Beverage Mart', 'Household & Provisions', 'Daily Mart', 'Hypermarket Outlet'],
       },
       {
-        type: 'RETAILER',
-        defaultCategory: 'Retailer',
-        prefixes: ['Block 12', 'Site 4', 'Ayat Terminal', 'Kotebe Gate', 'Abado Square', 'Condo Corner', 'Gurd Shola Lane', 'Meta Road'],
-        suffixes: ['Mini Mart', 'Beverage Kiosk', 'Retail Corner', 'Shop & Drop', 'General Store', 'Soft Drinks Depot'],
+        type: 'WHOLESALE',
+        defaultCategory: 'Wholesale',
+        prefixes: [
+          'Abado Main Freight Depot', 'Yeka Abado Beverage Wholesale', 'Meskelenya Soft Drinks Agency',
+          'Site 1 Bulk Distribution Hub', 'Abado Water & Juice Warehouse', 'G7 Wholesale Center'
+        ],
+        suffixes: ['Beverage Wholesale', 'Bottled Water Agency', 'FMCG Distribution Depot', 'Wholesale Warehouse', 'Logistics & Offload Yard'],
       },
       {
         type: 'INSTITUTION',
         defaultCategory: 'Other',
-        prefixes: ['Yeka Health Center', 'Ayat Community School', 'Kotebe University Wing', 'CMC Primary Clinic', 'Abado Youth Academy'],
-        suffixes: ['Campus', 'Clinic', 'Compound', 'Branch', 'Office'],
+        prefixes: [
+          'Rufael School Compound', 'Abado Health Center', 'Abado Police Precinct', 'Yeka Abado Youth Center',
+          'Abado Primary Community School', 'Abado Postal & Telecom Station', 'Abado Water Supply Depot'
+        ],
+        suffixes: ['Compound', 'Branch', 'Office', 'Health Station', 'Public Center', 'Facility'],
       },
     ],
   },
 
-  // 2. Bole / Airport / Atlas / Gerji / Medhanialem Corridor
+  // 2. Yeka / Ayat / CMC / Kotebe / Gurd Shola Corridor
   {
-    zone: 'Bole Medhanialem & Atlas',
+    zone: 'Yeka Ayat, CMC & Kotebe',
+    subCity: 'Yeka',
+    sector: 'YEKA',
+    centerLat: 9.0230,
+    centerLng: 38.8350,
+    latSpan: 0.040,
+    lngSpan: 0.045,
+    types: [
+      {
+        type: 'SUPERMARKET',
+        defaultCategory: 'Supermarket',
+        prefixes: ['Ayat Zone 2', 'Ayat Zone 3', 'CMC Michael', 'CMC Roundabout', 'Kotebe 02', 'Gurd Shola Athletics', 'Meta Road', 'Century Mall Area', 'Diaspora Square'],
+        suffixes: ['Supermarket', 'Mart & Deli', 'Food Store', 'Hypermarket', 'Provisions'],
+      },
+      {
+        type: 'CAFE',
+        defaultCategory: 'Hotel/Restaurant',
+        prefixes: ['Ayat Light Rail', 'CMC Sunrise', 'Kotebe Hills', 'Gurd Shola Cup', 'Diaspora Megenagna', 'Meta Brew', 'Century Brew', 'Meklit'],
+        suffixes: ['Coffee & Roastery', 'Espresso Lounge', 'Pastry & Bunna', 'Specialty Cafe', 'Cafe Bar'],
+      },
+      {
+        type: 'HOTEL_RESTAURANT',
+        defaultCategory: 'Hotel/Restaurant',
+        prefixes: ['CMC Royal', 'Ayat Grand', 'Kotebe Continental', 'Century Feast', 'Gurd Shola Garden', 'Meta View', 'Megenagna Peak'],
+        suffixes: ['Cultural Dining', 'Steakhouse', 'Family Restaurant', 'Grill & Lounge', 'Traditional Resto'],
+      },
+      {
+        type: 'RETAILER',
+        defaultCategory: 'Retailer',
+        prefixes: ['CMC Michael Gate', 'Ayat Terminal', 'Kotebe Meta Gate', 'Gurd Shola Lane', 'Megenagna Terminal St'],
+        suffixes: ['Mini Mart', 'Beverage Kiosk', 'Retail Corner', 'Shop', 'Drop Point'],
+      },
+      {
+        type: 'WHOLESALE',
+        defaultCategory: 'Wholesale',
+        prefixes: ['Kotebe Meta Brewery Corridor', 'Gurd Shola Wholesale Depot', 'CMC Industrial Depot', 'Ayat Supply Yard'],
+        suffixes: ['Beverage Wholesale', 'Bulk Agency', 'Distribution Depot', 'Supply Center'],
+      },
+    ],
+  },
+
+  // 3. Bole / Airport / Atlas / Medhanialem / Gerji Corridor
+  {
+    zone: 'Bole Medhanialem, Atlas & Gerji',
     subCity: 'Bole',
     sector: 'BOLE',
     centerLat: 8.9950,
     centerLng: 38.7880,
-    latSpan: 0.035,
-    lngSpan: 0.040,
+    latSpan: 0.038,
+    lngSpan: 0.042,
     types: [
       {
         type: 'MALL',
         defaultCategory: 'Supermarket',
-        prefixes: ['Atlas Avenue', 'Medhanialem Plaza', 'Airport Road', 'Gerji Imperial', 'Olympia Trade', 'Namibia', 'Tele Bole'],
+        prefixes: ['Atlas Avenue', 'Medhanialem Plaza', 'Airport Road', 'Gerji Imperial', 'Olympia Trade', 'Namibia St', 'Tele Bole', 'Morning Star', 'Berhane Adere'],
         suffixes: ['Mall & Commercial Center', 'Galleria', 'Trade Center', 'Tower & Shopping', 'Boutique Plaza'],
       },
       {
         type: 'CAFE',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Aroma', 'Habesha Gold', 'Highland', 'Red Bean', 'Bole Velvet', 'Skyline', 'Roast & Toast', 'Golden Cup', 'Caffè Nero Addis', 'Moka'],
+        prefixes: ['Aroma', 'Habesha Gold', 'Highland', 'Red Bean', 'Bole Velvet', 'Skyline', 'Roast & Toast', 'Golden Cup', 'Caffè Nero Addis', 'Moka', 'Babi', 'Tomoca', 'Kaldis'],
         suffixes: ['Coffee Lounge', 'Patisserie & Cafe', 'Artisan Roasters', 'Bistro & Espresso', 'Gelato & Coffee', 'Creperie'],
       },
       {
         type: 'HOTEL_RESTAURANT',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Crown Bole', 'Atlas Star', 'Diplomat', 'Blue Nile', 'Meridian', 'Abyssinia Premium', 'Safari', 'Red Sea', 'Oasis', 'Flavors of Addis'],
+        prefixes: ['Crown Bole', 'Atlas Star', 'Diplomat', 'Blue Nile', 'Meridian', 'Abyssinia Premium', 'Safari', 'Red Sea', 'Oasis', 'Skylight Deluxe', '2000 Habesha', 'Yod Abyssinia', 'Kategna'],
         suffixes: ['Steakhouse & Grill', 'Lounge & Bar', 'Fusion Bistro', 'Italian Trattoria', 'Boutique Hotel', 'Continental Dining'],
       },
       {
         type: 'SUPERMARKET',
         defaultCategory: 'Supermarket',
-        prefixes: ['Bole Gourmet', 'Atlas Fresh', 'Gerji City', 'Imperial Prime', 'Medhanialem Choice', 'Airport Road Super'],
+        prefixes: ['Bole Gourmet', 'Atlas Fresh', 'Gerji City', 'Imperial Prime', 'Medhanialem Choice', 'Safeway Gerji', 'Fantu Super', 'Fresh Corner'],
         suffixes: ['Supermarket', 'Gourmet Foods', 'Provisions & Deli', 'Hypermarket'],
       },
       {
         type: 'INSTITUTION',
         defaultCategory: 'Other',
-        prefixes: ['Bole International Cargo', 'Civil Aviation Bureau', 'Diplomatic Mission Annex', 'Korean Hospital Complex', 'Gerji Science Institute'],
+        prefixes: ['Bole International Cargo', 'Civil Aviation Bureau', 'Diplomatic Mission Annex', 'Korean Hospital Complex', 'Gerji Science Institute', 'Bole Customs'],
         suffixes: ['Depot', 'HQ', 'Campus', 'Medical Center', 'Headquarters'],
       },
     ],
   },
 
-  // 3. Mercato / Autobis Tera / Addis Ketema / Kolfe Corridor
+  // 4. Mercato / Autobis Tera / Addis Ketema / Kolfe Corridor
   {
-    zone: 'Mercato & Autobis Tera',
+    zone: 'Mercato, Autobis Tera & Kolfe',
     subCity: 'Addis Ketema',
     sector: 'MERCATO',
     centerLat: 9.0305,
     centerLng: 38.7360,
-    latSpan: 0.030,
-    lngSpan: 0.035,
+    latSpan: 0.035,
+    lngSpan: 0.038,
     types: [
       {
         type: 'WHOLESALE',
         defaultCategory: 'Wholesale',
-        prefixes: ['Autobis Tera Main', 'Bomb Tera', 'Shema Tera', 'Berbere Depot', 'Sophi Mall Area', 'Gojjam Ber', 'Tana Market', 'Cinema Ras Yard', 'Sebategna'],
+        prefixes: ['Autobis Tera Main', 'Bomb Tera', 'Shema Tera', 'Berbere Depot', 'Sophi Mall Area', 'Gojjam Ber', 'Tana Market', 'Cinema Ras Yard', 'Sebategna', 'Kolfe Checkpoint', 'Burayu Gate'],
         suffixes: ['Beverage Wholesale', 'Bulk Water Distributor', 'FMCG Depot', 'General Merchandise', 'Trading House', 'Logistics Terminal'],
       },
       {
         type: 'RETAILER',
         defaultCategory: 'Retailer',
-        prefixes: ['Anfo 18', 'Kolfe Checkpoint', 'Gefersa Way', 'Mercato Gate 4', 'Alem Bank Road', 'Ketema Center'],
+        prefixes: ['Anfo 18', 'Kolfe Checkpoint', 'Gefersa Way', 'Mercato Gate 4', 'Alem Bank Road', 'Ketema Center', 'Autobis Tera Gate 2'],
         suffixes: ['Grocery Store', 'Kiosk & Refreshment', 'Retail Outlet', 'Provisions', 'Corner Store'],
       },
       {
         type: 'CAFE',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Tana Corner', 'Autobis Gate', 'Shema Bar', 'Teklehaimanot', 'Abinet'],
+        prefixes: ['Tana Corner', 'Autobis Gate', 'Shema Bar', 'Teklehaimanot', 'Abinet', 'Kolfe Express'],
         suffixes: ['Traditional Coffee', 'Pastry & Tea', 'Bunna Bet', 'Cafe'],
       },
       {
         type: 'HOTEL_RESTAURANT',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Mercato Star', 'Tana View', 'Grand Ketema', 'Abinet Traditional', 'Teklehaimanot Feast'],
+        prefixes: ['Mercato Star', 'Tana View', 'Grand Ketema', 'Abinet Traditional', 'Teklehaimanot Feast', 'St. Paul Gate Resto'],
         suffixes: ['Restaurant', 'Local Kitchen', 'Hotel & Dining'],
       },
     ],
   },
 
-  // 4. Central / Arada / Kirkos / Piazza / Churchill Corridor
+  // 5. Central / Arada / Kirkos / Piazza / Churchill Corridor
   {
-    zone: 'Central City Piazza & Kirkos',
+    zone: 'Central City Piazza, Churchill & Kazanchis',
     subCity: 'Arada / Kirkos',
     sector: 'CENTRAL',
     centerLat: 9.0220,
     centerLng: 38.7520,
-    latSpan: 0.030,
-    lngSpan: 0.025,
+    latSpan: 0.032,
+    lngSpan: 0.028,
     types: [
       {
         type: 'INSTITUTION',
         defaultCategory: 'Other',
-        prefixes: ['Ministry of Trade', 'Federal Revenue Bureau', 'National Theatre', 'City Hall Administration', 'Immigration HQ', 'ECA Annex', 'CBE Ras Desta', 'Tele Churchill', 'St. George Cathedral'],
-        suffixes: ['Headquarters', 'Complex', 'Auditorium', 'Centre', 'Department', 'Tower'],
+        prefixes: ['Ministry of Trade', 'Federal Revenue Bureau', 'National Theatre', 'City Hall Administration', 'Immigration HQ', 'UN-ECA Africa Hall', 'African Union AU', 'CBE Ras Desta', 'Tele Churchill', 'St. George Cathedral', 'Black Lion Tikur Anbessa', 'AAU 6 Kilo', 'AAU 4 Kilo'],
+        suffixes: ['Headquarters', 'Complex', 'Auditorium', 'Centre', 'Department', 'Tower', 'Campus', 'Hospital'],
       },
       {
         type: 'CAFE',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Piazza Heritage', 'Churchill Brew', 'De Gaulle', 'Arada Classic', 'Taitu Garden', 'Ras Desta', 'Catering Square', 'Central Grind'],
+        prefixes: ['Piazza Heritage', 'Churchill Brew', 'De Gaulle', 'Arada Classic', 'Taitu Garden', 'Ras Desta', 'Catering Square', 'Central Grind', 'Enrico Pastry', 'Tomoca Wavel'],
         suffixes: ['Coffee House', 'Espresso Bar', 'Vintage Cafe', 'Pastry & Roastery', 'Tea Salon'],
       },
       {
         type: 'HOTEL_RESTAURANT',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Wavel Corner', 'Piazza Roma', 'Churchill View', 'Ras Hotel', 'Finfinne Springs', 'National Resto', 'Taitu Historic'],
+        prefixes: ['Wavel Corner', 'Piazza Roma', 'Churchill View', 'Ras Hotel', 'Finfinne Springs', 'National Resto', 'Taitu Historic', 'Castelli Italian', 'Sheraton Luxury', 'Hilton Addis', 'Hyatt Regency', 'Radisson Blu', 'Marriott Exec'],
         suffixes: ['Restaurant', 'Dining Room', 'Hotel & Lounge', 'Grill & Bar'],
       },
       {
         type: 'MALL',
         defaultCategory: 'Supermarket',
-        prefixes: ['Churchill Galleria', 'Piazza Commercial', 'Arada Shopping', 'Ras Desta Arcade'],
+        prefixes: ['Churchill Galleria', 'Piazza Commercial', 'Arada Shopping', 'Ras Desta Arcade', 'Dembel City Center', 'Getu Commercial'],
         suffixes: ['Mall', 'Commercial Center', 'Arcade'],
       },
     ],
   },
 
-  // 5. Southern / Nefas Silk / Lebu / Jemo / Kaliti Corridor
+  // 6. Southern / Nefas Silk / Lebu / Jemo / Kaliti Corridor
   {
     zone: 'Lebu, Jemo & Kaliti',
     subCity: 'Nefas Silk / Lebu',
     sector: 'LEBU',
     centerLat: 8.9600,
     centerLng: 38.7200,
-    latSpan: 0.050,
-    lngSpan: 0.055,
+    latSpan: 0.052,
+    lngSpan: 0.058,
     types: [
       {
         type: 'SUPERMARKET',
         defaultCategory: 'Supermarket',
-        prefixes: ['Jemo 1', 'Jemo 2', 'Jemo 3', 'Lebu Roundabout', 'Musika Bet', 'Varnero', 'Lafto Green', 'Gotera South'],
+        prefixes: ['Jemo 1', 'Jemo 2', 'Jemo 3', 'Lebu Roundabout', 'Musika Bet', 'Varnero', 'Lafto Green', 'Gotera South', 'Saris Abo'],
         suffixes: ['Supermarket', 'Grocery & Household', 'Fresh Food Mart', 'Provisions'],
       },
       {
         type: 'WHOLESALE',
         defaultCategory: 'Wholesale',
-        prefixes: ['Kaliti Customs Yard', 'Kality Freight', 'Nefas Silk Heavy', 'Akaki Bulk', 'Saris Abo Logistics'],
+        prefixes: ['Kaliti Customs Yard', 'Kality Freight', 'Nefas Silk Heavy', 'Akaki Bulk', 'Saris Abo Logistics', 'Gotera Pepsi Interchange'],
         suffixes: ['Distribution Depot', 'Wholesale Terminal', 'FMCG Warehouse', 'Beverage Center'],
       },
       {
         type: 'CAFE',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Jemo Sunset', 'Lebu Breeze', 'Lafto Stream', 'Musika Lounge', 'Varnero Corner'],
+        prefixes: ['Jemo Sunset', 'Lebu Breeze', 'Lafto Stream', 'Musika Lounge', 'Varnero Corner', 'Saris Coffee'],
         suffixes: ['Cafe & Bunna', 'Pastry Shop', 'Coffee Corner', 'Roastery'],
       },
       {
         type: 'HOTEL_RESTAURANT',
         defaultCategory: 'Hotel/Restaurant',
-        prefixes: ['Lafto Grand', 'Lebu Star', 'Jemo Heights', 'Saris Garden', 'South City'],
+        prefixes: ['Lafto Grand', 'Lebu Star', 'Jemo Heights', 'Saris Garden', 'South City Grill'],
         suffixes: ['Restaurant & Bar', 'Family Dining', 'Traditional Kitchen', 'Grill House'],
       },
       {
@@ -222,13 +296,12 @@ const ZONE_ANCHORS: ZoneAnchor[] = [
   },
 ];
 
-// Generates 1,000 uniquely distributed, realistic Addis Ababa business establishments & delivery stops
-export function generate1000AddisLocations(): AddisLocationPreset[] {
+// Generates 2,500 uniquely distributed, highly-detailed Addis Ababa business establishments & delivery stops
+// Featuring comprehensive coverage of Yeka Abado (condo blocks, sites, markets, cafes, gates) and all Addis corridors.
+export function generateComprehensiveAddisLocations(targetCount = 2500): AddisLocationPreset[] {
   const result: AddisLocationPreset[] = [...ADDIS_ABABA_TAGGED_LOCATIONS];
-  const targetCount = 1000;
   let counter = 1;
 
-  // We loop deterministically through the zone anchors to generate geographically balanced POIs
   while (result.length < targetCount) {
     for (const anchor of ZONE_ANCHORS) {
       if (result.length >= targetCount) break;
@@ -238,10 +311,10 @@ export function generate1000AddisLocations(): AddisLocationPreset[] {
 
         const prefix = t.prefixes[(counter * 7 + result.length) % t.prefixes.length];
         const suffix = t.suffixes[(counter * 11 + result.length) % t.suffixes.length];
-        const unitNumber = ((counter * 13) % 95) + 1;
+        const unitNumber = ((counter * 17) % 120) + 1;
         const name = `${prefix} ${suffix} #${unitNumber}`;
 
-        // Pseudo-random offset within the bounding corridor using deterministic trig
+        // Deterministic offset spread within the geographical zone
         const angle = ((counter * 47) % 360) * (Math.PI / 180);
         const radiusLat = Math.sin(counter * 3.14159) * (anchor.latSpan / 2);
         const radiusLng = Math.cos(counter * 2.71828) * (anchor.lngSpan / 2);
@@ -250,7 +323,7 @@ export function generate1000AddisLocations(): AddisLocationPreset[] {
         const lng = Number((anchor.centerLng + radiusLng).toFixed(6));
 
         result.push({
-          id: `addis-poi-${counter.toString().padStart(4, '0')}`,
+          id: `addis-poi-${counter.toString().padStart(5, '0')}`,
           name,
           subCity: anchor.subCity,
           sector: anchor.sector,
@@ -269,4 +342,4 @@ export function generate1000AddisLocations(): AddisLocationPreset[] {
   return result;
 }
 
-export const ADDIS_ABABA_1000_LOCATIONS: AddisLocationPreset[] = generate1000AddisLocations();
+export const ADDIS_ABABA_1000_LOCATIONS: AddisLocationPreset[] = generateComprehensiveAddisLocations(2500);

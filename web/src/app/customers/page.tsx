@@ -315,10 +315,20 @@ export default function CustomersPage() {
             <span>📍</span> Corridors:
           </span>
           <button
+            onClick={() => setSearch('Abado')}
+            className={`px-2.5 py-0.5 rounded-full font-bold transition-colors text-[11px] ${
+              search === 'Abado'
+                ? 'bg-accent text-primary-darker'
+                : 'bg-amber-100/70 hover:bg-amber-200 text-primary-darker border border-accent/40'
+            }`}
+          >
+            🏢 Yeka Abado (Sites & Condos)
+          </button>
+          <button
             onClick={() => setSearch('Yeka')}
             className="px-2.5 py-0.5 rounded-full bg-gray-50 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors text-[11px]"
           >
-            Yeka / Abado / CMC
+            Yeka / Ayat / CMC
           </button>
           <button
             onClick={() => setSearch('Bole')}
