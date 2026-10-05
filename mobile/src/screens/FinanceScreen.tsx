@@ -695,6 +695,9 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: 40,
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
   },
   topBar: {
     flexDirection: 'row',

@@ -1105,6 +1105,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing['5xl'],
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
   },
 
   // 1. Top Enterprise App Bar

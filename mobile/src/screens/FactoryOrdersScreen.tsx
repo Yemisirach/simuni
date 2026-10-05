@@ -294,7 +294,7 @@ export default function FactoryOrdersScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {/* 1. FACTORY LEDGER BALANCE CARD */}
       <View style={styles.balanceCard}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -683,6 +683,7 @@ export default function FactoryOrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: neutral[100], padding: spacing.md },
+  content: { maxWidth: 1200, width: '100%', alignSelf: 'center' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Balance Card

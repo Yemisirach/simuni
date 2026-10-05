@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Modal, ScrollView, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api/client';
@@ -65,22 +65,30 @@ export default function RouteListScreen({ navigation }: any) {
 
   const activeRoute = routes.find((r) => r.id === activeRouteId);
 
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
+  const numColumns = isDesktop ? 2 : 1;
+  const containerWidth = Math.min(width, 1200);
+  const cardWidth = isDesktop ? Math.floor((containerWidth - spacing.md * 3) / 2) : undefined;
+
   return (
     <View style={styles.container}>
       {/* Top Header Bar */}
       <View style={styles.headerBar}>
-        <View>
-          <Text style={styles.headerTitle}>Assigned Corridors</Text>
-          <Text style={styles.headerSub}>{routes.length} Available Routes</Text>
+        <View style={[styles.headerBarInner, isDesktop && { maxWidth: 1200, alignSelf: 'center' }]}>
+          <View>
+            <Text style={styles.headerTitle}>Assigned Corridors</Text>
+            <Text style={styles.headerSub}>{routes.length} Available Routes</Text>
+          </View>
+          <TouchableOpacity style={styles.switchButton} onPress={() => setShowSwitchModal(true)}>
+            <Text style={styles.switchButtonText}>⇄ Switch Corridor</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.switchButton} onPress={() => setShowSwitchModal(true)}>
-          <Text style={styles.switchButtonText}>⇄ Switch Corridor</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Active Route Highlight Banner */}
       {activeRoute && (
-        <View style={styles.activeBanner}>
+        <View style={[styles.activeBanner, isDesktop && { maxWidth: 1200, width: '100%', alignSelf: 'center' }]}>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
               <Text style={styles.activeBadge}>⭐ SELECTED ACTIVE ROUTE</Text>
@@ -102,9 +110,15 @@ export default function RouteListScreen({ navigation }: any) {
 
       {/* All Corridors List */}
       <FlatList
+        key={isDesktop ? 'desktop-grid-2' : 'mobile-list-1'}
         data={routes}
+        numColumns={numColumns}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={{ padding: spacing.md }}
+        contentContainerStyle={[
+          { padding: spacing.md },
+          isDesktop && { maxWidth: 1200, width: '100%', alignSelf: 'center' }
+        ]}
+        columnWrapperStyle={isDesktop ? styles.columnWrapper : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <Text style={styles.empty}>No routes assigned yet. Pull down to refresh.</Text>
@@ -127,7 +141,11 @@ export default function RouteListScreen({ navigation }: any) {
 
           return (
             <TouchableOpacity
-              style={[styles.card, isCurrentActive && styles.cardActive]}
+              style={[
+                styles.card,
+                isCurrentActive && styles.cardActive,
+                isDesktop && cardWidth ? { width: cardWidth, flex: undefined } : { flex: 1 },
+              ]}
               onPress={() => handleSelectActiveRoute(item)}
             >
               <View style={styles.cardHeader}>
@@ -220,13 +238,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: neutral[100] },
   headerBar: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: neutral[200],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  headerBarInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
+  },
+  columnWrapper: {
+    justifyContent: 'flex-start',
+    gap: spacing.md,
   },
   headerTitle: {
     fontFamily: fontFamily.serif,
