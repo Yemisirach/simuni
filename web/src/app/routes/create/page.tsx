@@ -38,9 +38,11 @@ export default function CreateRoutePage() {
       // Cluster matching
       if (clusterFilter === 'ALL') return true;
       if (!c.lat || !c.lng) return clusterFilter === 'ALL';
-      if (clusterFilter === 'YEKA') return c.lng > 38.80; // East (Yeka, Abado, Ayat)
-      if (clusterFilter === 'MERCATO') return c.lng < 38.74; // West (Mercato, Burayu, Kolfe)
-      if (clusterFilter === 'BOLE') return c.lng >= 38.74 && c.lng <= 38.80; // Center/Bole
+      if (clusterFilter === 'YEKA') return c.lng > 38.80; // East (Yeka, Abado, Ayat, CMC)
+      if (clusterFilter === 'MERCATO') return c.lng < 38.74 && c.lat > 9.01; // West (Mercato, Autobis Tera, Kolfe)
+      if (clusterFilter === 'BOLE') return c.lng >= 38.76 && c.lat < 9.01; // South-East (Bole Medhanialem, Atlas, Gerji)
+      if (clusterFilter === 'CENTRAL') return c.lat >= 9.01 && c.lat <= 9.04 && c.lng >= 38.74 && c.lng <= 38.77; // Piazza, Churchill, Mexico
+      if (clusterFilter === 'LEBU') return c.lat < 9.00 && c.lng < 38.74; // Lebu, Jemo, Nefas Silk
       return true;
     });
   }, [customers, clusterFilter, searchTerm]);
@@ -219,9 +221,11 @@ export default function CreateRoutePage() {
                 <div className="flex flex-wrap gap-1">
                   {[
                     { id: 'ALL', label: 'All Sectors' },
-                    { id: 'YEKA', label: '📍 Yeka / East' },
+                    { id: 'YEKA', label: '📍 Yeka / Abado' },
                     { id: 'MERCATO', label: '📍 Mercato / West' },
-                    { id: 'BOLE', label: '📍 Bole / Center' },
+                    { id: 'BOLE', label: '📍 Bole / South' },
+                    { id: 'CENTRAL', label: '📍 Central / Piazza' },
+                    { id: 'LEBU', label: '📍 Lebu / Jemo' },
                   ].map(cluster => (
                     <button
                       type="button"

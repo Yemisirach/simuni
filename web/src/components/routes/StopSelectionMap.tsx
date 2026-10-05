@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Rectangle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { ADDIS_ABABA_CENTRAL_LOCATION, ADDIS_ABABA_TAGGED_LOCATIONS } from '@/lib/constants/addisLocations';
 
 export interface CustomerLocation {
   id: string;
@@ -299,24 +300,46 @@ export default function StopSelectionMap({
 
           <div className="h-4 w-[1px] bg-border mx-0.5 hidden sm:block" />
 
-          {/* Quick Sectors */}
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] font-bold text-text-muted mr-1">Sector:</span>
+          {/* Quick Sectors & Tagged Location Fly-To */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-bold text-text-muted mr-0.5">Focus:</span>
             {[
-              { name: 'All Addis', center: [9.0227, 38.7469] as [number, number], zoom: 12 },
+              { name: '📍 Central Addis', center: [ADDIS_ABABA_CENTRAL_LOCATION.lat, ADDIS_ABABA_CENTRAL_LOCATION.lng] as [number, number], zoom: 13 },
               { name: 'Yeka Abado', center: [9.0255, 38.8150] as [number, number], zoom: 14 },
               { name: 'Mercato', center: [9.0305, 38.7360] as [number, number], zoom: 14 },
               { name: 'Bole', center: [8.9950, 38.7880] as [number, number], zoom: 14 },
+              { name: 'Lebu / Jemo', center: [8.9720, 38.7180] as [number, number], zoom: 14 },
+              { name: 'Piazza', center: [9.0352, 38.7518] as [number, number], zoom: 15 },
             ].map(sec => (
               <button
                 key={sec.name}
                 type="button"
                 onClick={() => setViewTarget({ center: sec.center, zoom: sec.zoom })}
-                className="px-2 py-1 text-[11px] font-semibold bg-white border border-border rounded text-text-muted hover:text-primary hover:border-gray-400 transition-colors"
+                className="px-2 py-1 text-[11px] font-semibold bg-white border border-border rounded text-text-muted hover:text-primary hover:border-accent transition-colors"
               >
                 {sec.name}
               </button>
             ))}
+
+            {/* Quick dropdown for all 20+ tagged locations */}
+            <select
+              aria-label="Jump to Tagged Location"
+              onChange={(e) => {
+                const loc = ADDIS_ABABA_TAGGED_LOCATIONS.find(l => l.id === e.target.value);
+                if (loc) {
+                  setViewTarget({ center: [loc.lat, loc.lng], zoom: 16 });
+                }
+              }}
+              defaultValue=""
+              className="text-[11px] font-bold text-primary bg-white border border-border rounded px-2 py-1 outline-none hover:border-accent cursor-pointer"
+            >
+              <option value="" disabled>Jump to Tagged Location ({ADDIS_ABABA_TAGGED_LOCATIONS.length})...</option>
+              {ADDIS_ABABA_TAGGED_LOCATIONS.map(loc => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.subCity})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

@@ -33,6 +33,19 @@ export class CustomersController {
     return this.customersService.update(user.workspaceId, id, dto);
   }
 
+  @Post('seed-addis')
+  seedAddis(
+    @CurrentUser() user,
+    @Body('locations') locations: any[],
+    @Body('applyToAllWorkspaces') applyToAllWorkspaces?: boolean,
+  ) {
+    return this.customersService.seedAddisLocations(
+      user.workspaceId,
+      locations,
+      Boolean(applyToAllWorkspaces),
+    );
+  }
+
   @Delete(':id')
   remove(@CurrentUser() user, @Param('id') id: string) {
     return this.customersService.remove(user.workspaceId, id);

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { fetchApi } from '@/lib/api';
+import { ADDIS_ABABA_TAGGED_LOCATIONS, ADDIS_ABABA_CENTRAL_LOCATION } from '@/lib/constants/addisLocations';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -9,8 +10,12 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSeedModal, setShowSeedModal] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Quick Preset Location selector in Modal
+  const [selectedPresetId, setSelectedPresetId] = useState('');
 
   // Add form state
   const [form, setForm] = useState({
@@ -33,6 +38,9 @@ export default function CustomersPage() {
     lng: '',
   });
 
+  // Seed Addis Hubs Form state
+  const [applyToAllWorkspaces, setApplyToAllWorkspaces] = useState(true);
+
   const loadCustomers = async () => {
     setLoading(true);
     try {
@@ -48,6 +56,35 @@ export default function CustomersPage() {
   useEffect(() => {
     loadCustomers();
   }, []);
+
+  // When a preset location is picked in Add Modal, automatically autofill name, category, address & coordinates
+  const handleSelectPreset = (presetId: string) => {
+    setSelectedPresetId(presetId);
+    if (!presetId) return;
+
+    if (presetId === 'central-hub') {
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || ADDIS_ABABA_CENTRAL_LOCATION.name,
+        address: prev.address || 'Piazza / Churchill Ave, Central Addis Ababa',
+        lat: String(ADDIS_ABABA_CENTRAL_LOCATION.lat),
+        lng: String(ADDIS_ABABA_CENTRAL_LOCATION.lng),
+      }));
+      return;
+    }
+
+    const preset = ADDIS_ABABA_TAGGED_LOCATIONS.find((l) => l.id === presetId);
+    if (preset) {
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || preset.name,
+        address: prev.address || `${preset.name}, ${preset.subCity}`,
+        category: preset.defaultCategory || prev.category,
+        lat: String(preset.lat),
+        lng: String(preset.lng),
+      }));
+    }
+  };
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +106,7 @@ export default function CustomersPage() {
       });
       setShowAddModal(false);
       setForm({ name: '', phone: '', address: '', category: 'Retailer', lat: '', lng: '' });
+      setSelectedPresetId('');
       await loadCustomers();
     } catch (err: any) {
       alert(err.message || 'Failed to create customer');
@@ -134,6 +172,41 @@ export default function CustomersPage() {
     }
   };
 
+  // Bulk Seed Tagged Addis Ababa Locations for all workspaces
+  const handleSeedAddisLocations = async () => {
+    setSubmitting(true);
+    try {
+      const formatted = ADDIS_ABABA_TAGGED_LOCATIONS.map((loc) => ({
+        name: loc.name,
+        phone: '0911000000',
+        address: `${loc.name}, ${loc.subCity}`,
+        category: loc.defaultCategory || 'Retailer',
+        lat: loc.lat,
+        lng: loc.lng,
+      }));
+
+      const res = await fetchApi<any>('/customers/seed-addis', {
+        method: 'POST',
+        body: JSON.stringify({
+          locations: formatted,
+          applyToAllWorkspaces,
+        }),
+      });
+
+      alert(
+        `✅ Successfully synced ${res.createdCount || formatted.length} tagged Addis Ababa commercial hubs across ${
+          res.targetWorkspacesCount || 1
+        } workspace(s)!`
+      );
+      setShowSeedModal(false);
+      await loadCustomers();
+    } catch (err: any) {
+      alert(err.message || 'Failed to seed Addis Ababa locations');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const filtered = customers.filter((c) =>
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.phone?.includes(search) ||
@@ -147,9 +220,18 @@ export default function CustomersPage() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
           <h1 className="text-3xl font-bold font-serif text-primary">Customers & Delivery Stops</h1>
-          <p className="text-text-muted mt-1">Manage wholesale buyers, retail kiosks, geofenced GPS locations, and accounts</p>
+          <p className="text-text-muted mt-1">
+            Manage wholesale buyers, retail kiosks, geofenced GPS locations across Addis Ababa hubs
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setShowSeedModal(true)}
+            className="border border-accent bg-accent/10 text-primary-darker hover:bg-accent/20 text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+          >
+            <span>🇪🇹</span>
+            <span>Sync All Addis Tagged Hubs</span>
+          </button>
           <button
             onClick={loadCustomers}
             disabled={loading}
@@ -158,7 +240,10 @@ export default function CustomersPage() {
             ↻ Refresh
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setSelectedPresetId('');
+              setShowAddModal(true);
+            }}
             className="bg-accent text-primary-darker text-sm font-bold px-4 py-2 rounded-lg hover:bg-accent-light transition-colors shadow-sm"
           >
             + Add Customer
@@ -166,12 +251,69 @@ export default function CustomersPage() {
         </div>
       </div>
 
+      {/* Quick Tagged Locations Chip Bar */}
+      <div className="bg-surface border border-border rounded-xl p-3 shadow-xs flex items-center justify-between gap-3 overflow-x-auto text-xs">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="font-bold text-primary flex items-center gap-1">
+            <span>📍</span> Tagged Hubs:
+          </span>
+          <button
+            onClick={() => {
+              setSearch('Yeka');
+            }}
+            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            Yeka / Abado (6)
+          </button>
+          <button
+            onClick={() => {
+              setSearch('Mercato');
+            }}
+            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            Mercato / Autobis Tera (5)
+          </button>
+          <button
+            onClick={() => {
+              setSearch('Bole');
+            }}
+            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            Bole / Atlas / Gerji (5)
+          </button>
+          <button
+            onClick={() => {
+              setSearch('Lebu');
+            }}
+            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            Lebu / Jemo (3)
+          </button>
+          <button
+            onClick={() => {
+              setSearch('Piazza');
+            }}
+            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            Piazza / Churchill (5)
+          </button>
+        </div>
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="text-accent font-bold text-xs whitespace-nowrap hover:underline"
+          >
+            Show All
+          </button>
+        )}
+      </div>
+
       {/* Filter / Search Bar */}
       <div className="bg-surface border border-border rounded-xl p-4 shadow-sm flex items-center gap-3">
         <span className="text-gray-400">🔍</span>
         <input
           type="text"
-          placeholder="Search customer by name, phone, category, or neighborhood..."
+          placeholder="Search customer by name, phone, category, sub-city, or neighborhood..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 bg-transparent text-sm outline-none text-primary"
@@ -186,7 +328,7 @@ export default function CustomersPage() {
       {/* Customers Table */}
       <div className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
         <div className="p-4 border-b border-border bg-gray-50 flex justify-between items-center">
-          <h3 className="font-serif font-bold text-lg">Registered Clients</h3>
+          <h3 className="font-serif font-bold text-lg">Registered Clients & Tagged GPS Waypoints</h3>
           <span className="bg-primary text-white text-xs px-2.5 py-1 rounded-full font-bold">
             {loading ? '...' : `${filtered.length} of ${customers.length}`}
           </span>
@@ -227,8 +369,11 @@ export default function CustomersPage() {
                     <td className="p-4">{c.address || '-'}</td>
                     <td className="p-4 text-xs font-mono text-text-muted">
                       {c.lat && c.lng ? (
-                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          📍 {Number(c.lat).toFixed(4)}, {Number(c.lng).toFixed(4)}
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1">
+                          <span>📍</span>
+                          <span>
+                            {Number(c.lat).toFixed(4)}, {Number(c.lng).toFixed(4)}
+                          </span>
                         </span>
                       ) : (
                         <span className="text-gray-400">No GPS set</span>
@@ -257,7 +402,9 @@ export default function CustomersPage() {
               ) : (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-text-muted">
-                    {search ? 'No customers match your search.' : 'No customers found. Click + Add Customer above.'}
+                    {search
+                      ? 'No customers match your search.'
+                      : 'No customers found. Click + Add Customer or Sync All Addis Tagged Hubs.'}
                   </td>
                 </tr>
               )}
@@ -266,15 +413,66 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Add Customer Modal */}
+      {/* Add Customer Modal with Tagged Preset Picker */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-border">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-serif font-bold text-xl text-primary">Add New Customer</h3>
+          <div className="bg-surface rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-border max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 border-b border-border pb-3">
+              <div>
+                <h3 className="font-serif font-bold text-xl text-primary">Add New Customer</h3>
+                <p className="text-xs text-text-muted">Register a store or pick from Addis Ababa tagged hubs</p>
+              </div>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">
                 ✕
               </button>
+            </div>
+
+            {/* Quick Addis Location Preset Dropdown */}
+            <div className="mb-4 p-3 bg-amber-50/70 rounded-xl border border-accent/40">
+              <label className="block text-xs font-extrabold text-primary-darker mb-1 uppercase flex items-center justify-between">
+                <span>⚡ Autofill from Tagged Addis Location</span>
+                <span className="text-[10px] text-accent font-bold">24+ Verified Hubs</span>
+              </label>
+              <select
+                value={selectedPresetId}
+                onChange={(e) => handleSelectPreset(e.target.value)}
+                className="w-full border border-accent/50 rounded-lg p-2 text-xs bg-white font-medium outline-none focus:border-accent"
+              >
+                <option value="">-- Choose a Tagged Location or Type Manually --</option>
+                <option value="central-hub">📍 Central Addis Hub (Piazza / Churchill Ave)</option>
+                <optgroup label="Yeka / East Hubs">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.sector === 'YEKA').map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.subCity})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Mercato / West Hubs">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.sector === 'MERCATO' || l.sector === 'KOLFE').map(
+                    (l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} ({l.subCity})
+                      </option>
+                    )
+                  )}
+                </optgroup>
+                <optgroup label="Bole / South-East Hubs">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.sector === 'BOLE').map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.subCity})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Central & Southern Hubs (Kirkos, Arada, Lebu)">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter(
+                    (l) => l.sector === 'CENTRAL' || l.sector === 'ARADA' || l.sector === 'LEBU' || l.sector === 'AKAKI'
+                  ).map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.subCity})
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
             </div>
 
             <form onSubmit={handleCreateCustomer} className="flex flex-col gap-4">
@@ -283,7 +481,7 @@ export default function CustomersPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Cinema Ras Mart"
+                  placeholder="e.g. Cinema Ras Mart or Yeka Abado Mini Market"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full border border-border rounded-lg p-2.5 text-sm outline-none focus:border-accent"
@@ -369,6 +567,63 @@ export default function CustomersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Seed Addis Ababa Locations Modal */}
+      {showSeedModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-border">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🇪🇹</span>
+                <h3 className="font-serif font-bold text-xl text-primary">Sync All Addis Locations</h3>
+              </div>
+              <button onClick={() => setShowSeedModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">
+                ✕
+              </button>
+            </div>
+
+            <p className="text-text-muted text-xs leading-relaxed mb-4">
+              This will automatically tag and register <strong>{ADDIS_ABABA_TAGGED_LOCATIONS.length} verified commercial centers</strong> across
+              all major Addis Ababa corridors (Yeka Abado, Mercato, Bole, Lebu, Piazza, CMC, etc.) with precise GPS coordinates.
+            </p>
+
+            <div className="p-3 bg-gray-50 rounded-xl border border-border mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={applyToAllWorkspaces}
+                  onChange={(e) => setApplyToAllWorkspaces(e.target.checked)}
+                  className="w-4 h-4 accent-accent rounded"
+                />
+                <span className="text-xs font-bold text-primary">
+                  Apply to all workspaces (Universal Multi-tenant Sync)
+                </span>
+              </label>
+              <p className="text-[11px] text-text-muted mt-1 ml-6">
+                Enables newly onboarded workspaces and business owners to immediately access all mapped Addis delivery stops.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowSeedModal(false)}
+                className="px-4 py-2 border border-border rounded-lg text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSeedAddisLocations}
+                disabled={submitting}
+                className="bg-accent text-primary-darker font-bold px-5 py-2 rounded-lg text-sm hover:bg-accent-light transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {submitting ? 'Syncing...' : `Sync ${ADDIS_ABABA_TAGGED_LOCATIONS.length} Locations`}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -490,7 +745,8 @@ export default function CustomersPage() {
               </div>
               <h3 className="font-serif font-bold text-lg text-primary mb-1">Delete Customer</h3>
               <p className="text-text-muted text-xs mb-4">
-                Are you sure you want to delete <strong className="text-primary">{customerToDelete.name}</strong>? This action cannot be undone.
+                Are you sure you want to delete <strong className="text-primary">{customerToDelete.name}</strong>? This
+                action cannot be undone.
               </p>
             </div>
 

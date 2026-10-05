@@ -116,4 +116,60 @@ export class CustomersService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  /**
+   * Bulk seed standard Addis Ababa tagged commercial hubs & customer locations
+   * for the current workspace (or all workspaces if requested).
+   */
+  async seedAddisLocations(workspaceId: string, locations: Array<{
+    name: string;
+    phone?: string;
+    address?: string;
+    category?: string;
+    lat: number;
+    lng: number;
+  }>, applyToAllWorkspaces = false) {
+    const targetWsIds: string[] = [];
+
+    if (applyToAllWorkspaces) {
+      const allOrgs = await this.prisma.organization.findMany({ select: { id: true } });
+      targetWsIds.push(...allOrgs.map((o) => o.id));
+    } else {
+      const wsId = await this.resolveWorkspaceId(workspaceId);
+      targetWsIds.push(wsId);
+    }
+
+    let createdCount = 0;
+    for (const wsId of targetWsIds) {
+      for (const loc of locations) {
+        // Upsert or avoid exact duplicates by name within workspace
+        const existing = await this.prisma.customer.findFirst({
+          where: { workspaceId: wsId, name: loc.name },
+        });
+
+        if (!existing) {
+          await this.prisma.customer.create({
+            data: {
+              workspaceId: wsId,
+              name: loc.name,
+              phone: loc.phone || '0911000000',
+              address: loc.address || 'Addis Ababa',
+              category: loc.category || 'Retailer',
+              lat: loc.lat,
+              lng: loc.lng,
+            },
+          });
+          createdCount++;
+        } else if (existing.lat == null || existing.lng == null) {
+          // Update missing coordinates
+          await this.prisma.customer.update({
+            where: { id: existing.id },
+            data: { lat: loc.lat, lng: loc.lng, address: loc.address || existing.address },
+          });
+        }
+      }
+    }
+
+    return { success: true, createdCount, targetWorkspacesCount: targetWsIds.length };
+  }
 }
