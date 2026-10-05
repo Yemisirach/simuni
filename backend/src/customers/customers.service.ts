@@ -104,7 +104,39 @@ export class CustomersService {
 
   async remove(workspaceId: string, id: string) {
     await this.findOne(workspaceId, id);
-    return this.prisma.customer.delete({ where: { id } });
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Delete associated route stops
+      await tx.routeStop.deleteMany({ where: { customerId: id } });
+
+      // 2. Find all orders for this customer
+      const orders = await tx.order.findMany({ where: { customerId: id }, select: { id: true } });
+      const orderIds = orders.map((o) => o.id);
+
+      if (orderIds.length > 0) {
+        // 3. Find and delete invoice payments and invoices
+        const invoices = await tx.invoice.findMany({
+          where: { OR: [{ customerId: id }, { orderId: { in: orderIds } }] },
+          select: { id: true },
+        });
+        const invoiceIds = invoices.map((inv) => inv.id);
+
+        if (invoiceIds.length > 0) {
+          await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+          await tx.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+        }
+
+        // 4. Delete deliveries and order items
+        await tx.delivery.deleteMany({ where: { orderId: { in: orderIds } } });
+        await tx.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+
+        // 5. Delete orders
+        await tx.order.deleteMany({ where: { id: { in: orderIds } } });
+      }
+
+      // 6. Delete customer record
+      return tx.customer.delete({ where: { id } });
+    });
   }
 
   /** Order + payment history for a single customer, used on the customer profile screen. */

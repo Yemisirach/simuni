@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchApi } from '@/lib/api';
 import { ADDIS_ABABA_TAGGED_LOCATIONS, ADDIS_ABABA_CENTRAL_LOCATION } from '@/lib/constants/addisLocations';
+import { ADDIS_ABABA_1000_LOCATIONS } from '@/lib/constants/addis1000Locations';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -172,11 +173,11 @@ export default function CustomersPage() {
     }
   };
 
-  // Bulk Seed Tagged Addis Ababa Locations for all workspaces
+  // Bulk Seed Tagged Addis Ababa Locations for all workspaces (1,000 locations)
   const handleSeedAddisLocations = async () => {
     setSubmitting(true);
     try {
-      const formatted = ADDIS_ABABA_TAGGED_LOCATIONS.map((loc) => ({
+      const formatted = ADDIS_ABABA_1000_LOCATIONS.map((loc) => ({
         name: loc.name,
         phone: '0911000000',
         address: `${loc.name}, ${loc.subCity}`,
@@ -194,7 +195,7 @@ export default function CustomersPage() {
       });
 
       alert(
-        `✅ Successfully synced ${res.createdCount || formatted.length} tagged Addis Ababa commercial hubs across ${
+        `✅ Successfully synced ${res.createdCount || formatted.length} locations across ${
           res.targetWorkspacesCount || 1
         } workspace(s)!`
       );
@@ -648,8 +649,8 @@ export default function CustomersPage() {
             </div>
 
             <p className="text-text-muted text-xs leading-relaxed mb-4">
-              This will automatically tag and register <strong>{ADDIS_ABABA_TAGGED_LOCATIONS.length} verified commercial centers</strong> across
-              all major Addis Ababa corridors (Yeka Abado, Mercato, Bole, Lebu, Piazza, CMC, etc.) with precise GPS coordinates.
+              This will automatically tag and register <strong>{ADDIS_ABABA_1000_LOCATIONS.length} verified commercial centers &amp; delivery stops</strong> across
+              all major Addis Ababa corridors (shopping malls, hotels, restaurants, cafes, universities, hospitals, supermarkets, and wholesale depots) with precise GPS coordinates.
             </p>
 
             <div className="p-3 bg-gray-50 rounded-xl border border-border mb-4">
