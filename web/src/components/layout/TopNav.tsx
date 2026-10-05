@@ -44,6 +44,16 @@ export function TopNav() {
     router.push('/login');
   };
 
+  const [workspaceName, setWorkspaceName] = useState('Topwater Ethiopia');
+
+  useEffect(() => {
+    fetchApi<{ name: string }>('/workspace/me')
+      .then((data) => {
+        if (data?.name) setWorkspaceName(data.name);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <header className="bg-primary-darker text-white sticky top-0 z-50 border-b border-[#262626] shadow-sm">
       <div className="px-4 md:px-6 h-16 flex items-center justify-between gap-3">
@@ -60,26 +70,19 @@ export function TopNav() {
             </span>
           </Link>
           <span className="bg-accent/90 text-primary-darker text-[9px] md:text-[10px] font-extrabold py-0.5 px-2 rounded-full tracking-wider uppercase hidden sm:inline-block">
-            Ethiopia B2B
+            {workspaceName}
           </span>
         </div>
 
         {/* Center: Navigation (Desktop) */}
         <nav className="hidden lg:flex flex-1 justify-center items-center gap-1 xl:gap-2">
-          {/* Hub Selector */}
-          <div className="relative mr-2">
-            <select
-              value={selectedHub}
-              onChange={(e) => setSelectedHub(e.target.value)}
-              className="bg-[#262626] border border-[#3A3A3A] text-gray-200 text-xs font-semibold pl-3 pr-8 py-1.5 rounded-lg cursor-pointer outline-none focus:ring-2 focus:ring-accent appearance-none hover:bg-[#2F2F2F] transition-colors"
-            >
-              <option value="Addis Ababa Hub" className="bg-[#1A1A1A] text-white">Addis Ababa Hub</option>
-              <option value="Dire Dawa Branch" className="bg-[#1A1A1A] text-white">Dire Dawa Branch</option>
-              <option value="Adama Fulfillment" className="bg-[#1A1A1A] text-white">Adama Fulfillment</option>
-            </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">
-              ▼
-            </span>
+          {/* Active Company / Workspace Pill */}
+          <div className="relative mr-2 flex items-center">
+            <div className="bg-[#262626] border border-accent/30 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10B981]" />
+              <span>{workspaceName}</span>
+              <span className="text-[10px] text-gray-400 font-normal">| Yeka Abado</span>
+            </div>
           </div>
 
           {navItems.map((item) => {
