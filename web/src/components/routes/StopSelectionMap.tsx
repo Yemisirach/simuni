@@ -38,7 +38,7 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-// Custom DivIcon generator to avoid Next.js asset resolution issues and provide rich states
+// Custom DivIcon generator to provide high contrast over both satellite and street view
 function createMarkerIcon(isSelected: boolean, orderNumber?: number) {
   return L.divIcon({
     className: 'custom-stop-pin',
@@ -55,10 +55,10 @@ function createMarkerIcon(isSelected: boolean, orderNumber?: number) {
         font-weight: 800;
         font-size: 13px;
         border: 2.5px solid ${isSelected ? '#FFFFFF' : '#C4A35A'};
-        box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.6);
         cursor: pointer;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        transform: ${isSelected ? 'scale(1.15)' : 'scale(1.0)'};
+        transform: ${isSelected ? 'scale(1.2)' : 'scale(1.0)'};
       ">
         ${isSelected ? (orderNumber !== undefined ? `${orderNumber}` : '✓') : '📍'}
       </div>
@@ -103,6 +103,9 @@ export default function StopSelectionMap({
   // Addis Ababa default center
   const defaultCenter: [number, number] = [9.0227, 38.7469];
   const [viewTarget, setViewTarget] = useState<{ center: [number, number]; zoom: number } | null>(null);
+
+  // Map Layer: 'SATELLITE' (default) vs 'STREET'
+  const [mapLayer, setMapLayer] = useState<'SATELLITE' | 'STREET'>('SATELLITE');
 
   // Active Tool: 'PIN' | 'CIRCLE' | 'RECTANGLE'
   const [tool, setTool] = useState<'PIN' | 'CIRCLE' | 'RECTANGLE'>('PIN');
@@ -200,7 +203,7 @@ export default function StopSelectionMap({
     <div className="flex flex-col h-full w-full bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
       {/* Top Map Control Bar */}
       <div className="p-3 bg-gray-50 border-b border-border flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-bold text-primary mr-1">Tools:</span>
           
           <button
@@ -264,28 +267,61 @@ export default function StopSelectionMap({
           )}
         </div>
 
-        {/* Sector Quick Jump */}
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] font-bold text-text-muted mr-1">Sector:</span>
-          {[
-            { name: 'All Addis', center: [9.0227, 38.7469] as [number, number], zoom: 12 },
-            { name: 'Mercato', center: [9.0305, 38.7360] as [number, number], zoom: 14 },
-            { name: 'Yeka', center: [9.0255, 38.8150] as [number, number], zoom: 14 },
-            { name: 'Bole', center: [8.9950, 38.7880] as [number, number], zoom: 14 },
-          ].map(sec => (
+        {/* View Mode & Sector Quick Jump */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Layer Switcher (Satellite vs Street) */}
+          <div className="flex items-center bg-white border border-border rounded-lg p-0.5 shadow-xs">
             <button
-              key={sec.name}
               type="button"
-              onClick={() => setViewTarget({ center: sec.center, zoom: sec.zoom })}
-              className="px-2 py-1 text-[11px] font-semibold bg-white border border-border rounded text-text-muted hover:text-primary hover:border-gray-400 transition-colors"
+              onClick={() => setMapLayer('SATELLITE')}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md flex items-center gap-1 transition-all ${
+                mapLayer === 'SATELLITE'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-text-muted hover:text-primary'
+              }`}
             >
-              {sec.name}
+              <span>🛰️</span>
+              <span>Satellite</span>
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setMapLayer('STREET')}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md flex items-center gap-1 transition-all ${
+                mapLayer === 'STREET'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-text-muted hover:text-primary'
+              }`}
+            >
+              <span>🗺️</span>
+              <span>Street</span>
+            </button>
+          </div>
+
+          <div className="h-4 w-[1px] bg-border mx-0.5 hidden sm:block" />
+
+          {/* Quick Sectors */}
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] font-bold text-text-muted mr-1">Sector:</span>
+            {[
+              { name: 'All Addis', center: [9.0227, 38.7469] as [number, number], zoom: 12 },
+              { name: 'Yeka Abado', center: [9.0255, 38.8150] as [number, number], zoom: 14 },
+              { name: 'Mercato', center: [9.0305, 38.7360] as [number, number], zoom: 14 },
+              { name: 'Bole', center: [8.9950, 38.7880] as [number, number], zoom: 14 },
+            ].map(sec => (
+              <button
+                key={sec.name}
+                type="button"
+                onClick={() => setViewTarget({ center: sec.center, zoom: sec.zoom })}
+                className="px-2 py-1 text-[11px] font-semibold bg-white border border-border rounded text-text-muted hover:text-primary hover:border-gray-400 transition-colors"
+              >
+                {sec.name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Geofence Active Sub-Toolbar (When circle or rectangle is active) */}
+      {/* Geofence Active Sub-Toolbar */}
       {tool === 'CIRCLE' && (
         <div className="px-3 py-2 bg-amber-50/70 border-b border-accent/30 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
@@ -341,10 +377,28 @@ export default function StopSelectionMap({
           scrollWheelZoom={true}
           style={{ height: '100%', width: '100%' }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          {mapLayer === 'SATELLITE' ? (
+            <>
+              {/* Esri World Imagery Satellite Tiles */}
+              <TileLayer
+                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={19}
+              />
+              {/* Esri Transportation & Labels Overlay for readability */}
+              <TileLayer
+                attribution='&copy; Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={19}
+                opacity={0.8}
+              />
+            </>
+          ) : (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          )}
 
           <MapEventsHandler selectionTool={tool} onMapClick={handleMapClick} />
           <MapViewController target={viewTarget} />
@@ -357,7 +411,7 @@ export default function StopSelectionMap({
               pathOptions={{
                 color: '#C4A35A',
                 fillColor: '#C4A35A',
-                fillOpacity: 0.18,
+                fillOpacity: 0.22,
                 weight: 2.5,
                 dashArray: '5, 5',
               }}
@@ -371,7 +425,7 @@ export default function StopSelectionMap({
               pathOptions={{
                 color: '#C4A35A',
                 fillColor: '#C4A35A',
-                fillOpacity: 0.18,
+                fillOpacity: 0.22,
                 weight: 2.5,
                 dashArray: '5, 5',
               }}

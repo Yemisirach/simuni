@@ -31,5 +31,37 @@ export const routesService = {
 
   async getRouteProgress(id: string): Promise<any> {
     return fetchApi<any>(`/routes/${id}/progress`);
-  }
+  },
+
+  async updateRoute(id: string, data: Partial<{ name: string; date: string; agentId: string | null; status: string }>): Promise<Route> {
+    return fetchApi<Route>(`/routes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteRoute(id: string): Promise<any> {
+    return fetchApi<any>(`/routes/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async assignAgent(id: string, agentId: string): Promise<any> {
+    return fetchApi<any>(`/routes/${id}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify({ agentId }),
+    });
+  },
+
+  async startRoute(id: string): Promise<any> {
+    return fetchApi<any>(`/routes/${id}/start`, {
+      method: 'PATCH',
+    });
+  },
+
+  async completeRoute(id: string): Promise<any> {
+    return fetchApi<any>(`/routes/${id}/complete`, {
+      method: 'PATCH',
+    });
+  },
 };

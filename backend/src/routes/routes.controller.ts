@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RoutesService } from './routes.service';
 import { CreateRouteDto } from './dto/create-route.dto';
@@ -63,6 +63,16 @@ export class RoutesController {
       { lat: Number(lat), lng: Number(lng) },
       stopId,
     );
+  }
+
+  @Patch(':id')
+  update(@CurrentUser() user, @Param('id') id: string, @Body() dto: any) {
+    return this.routesService.update(user.workspaceId, id, dto);
+  }
+
+  @Delete(':id')
+  remove(@CurrentUser() user, @Param('id') id: string) {
+    return this.routesService.remove(user.workspaceId, id);
   }
 
   @Post(':id/optimize')

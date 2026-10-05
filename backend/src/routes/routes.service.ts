@@ -159,4 +159,46 @@ export class RoutesService {
 
     return this.findOne(workspaceId, id);
   }
+
+  /** Update route basic details (name, date, agentId, status, and optionally customer stops). */
+  async update(workspaceId: string, id: string, dto: any) {
+    await this.findOne(workspaceId, id);
+
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.date !== undefined) data.date = new Date(dto.date);
+    if (dto.agentId !== undefined) data.agentId = dto.agentId || null;
+    if (dto.status !== undefined) data.status = dto.status;
+
+    if (dto.customerIds && Array.isArray(dto.customerIds)) {
+      // Re-link stops
+      await this.prisma.routeStop.deleteMany({ where: { routeId: id } });
+      data.stops = {
+        create: dto.customerIds.map((customerId: string, i: number) => ({
+          customerId,
+          sequence: i + 1,
+        })),
+      };
+    }
+
+    return this.prisma.route.update({
+      where: { id },
+      data,
+      include: {
+        agent: true,
+        stops: {
+          include: { customer: true },
+          orderBy: { sequence: 'asc' },
+        },
+      },
+    });
+  }
+
+  /** Delete a route and cascade-delete its stops. */
+  async remove(workspaceId: string, id: string) {
+    await this.findOne(workspaceId, id);
+    // Delete stops first
+    await this.prisma.routeStop.deleteMany({ where: { routeId: id } });
+    return this.prisma.route.delete({ where: { id } });
+  }
 }

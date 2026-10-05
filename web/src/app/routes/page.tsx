@@ -11,6 +11,19 @@ export default function RoutesAgentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit Route Modal State
+  const [editingRoute, setEditingRoute] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    date: '',
+    agentId: '',
+    status: 'PLANNED',
+  });
+
+  // Delete Route Confirmation State
+  const [routeToDelete, setRouteToDelete] = useState<any | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -33,14 +46,75 @@ export default function RoutesAgentsPage() {
     loadData();
   }, []);
 
+  const openEditModal = (r: any) => {
+    setEditingRoute(r);
+    setEditForm({
+      name: r.name || '',
+      date: r.date ? new Date(r.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      agentId: r.agentId || '',
+      status: r.status || 'PLANNED',
+    });
+  };
+
+  const handleUpdateRoute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRoute || !editForm.name.trim()) return alert('Route name is required');
+    setActionLoading(true);
+    try {
+      await routesService.updateRoute(editingRoute.id, {
+        name: editForm.name.trim(),
+        date: new Date(editForm.date).toISOString(),
+        agentId: editForm.agentId || null,
+        status: editForm.status,
+      });
+      setEditingRoute(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update route');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteRoute = async () => {
+    if (!routeToDelete) return;
+    setActionLoading(true);
+    try {
+      await routesService.deleteRoute(routeToDelete.id);
+      setRouteToDelete(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete route');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleQuickStatusChange = async (routeId: string, action: 'start' | 'complete') => {
+    setActionLoading(true);
+    try {
+      if (action === 'start') {
+        await routesService.startRoute(routeId);
+      } else {
+        await routesService.completeRoute(routeId);
+      }
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || `Failed to ${action} route`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-end">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
           <h1 className="text-3xl font-bold font-serif text-primary">
-            Field Routes & Agents
+            Field Routes & Fleet Operations
           </h1>
-          <p className="text-text-muted mt-1">Manage active dispatches and fleet operations</p>
+          <p className="text-text-muted mt-1">Manage active itineraries, agent dispatches, and delivery manifests</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -81,7 +155,7 @@ export default function RoutesAgentsPage() {
                 <th className="p-4 border-b border-border">Assigned Agent</th>
                 <th className="p-4 border-b border-border">Stops</th>
                 <th className="p-4 border-b border-border">Status</th>
-                <th className="p-4 border-b border-border text-right">Action</th>
+                <th className="p-4 border-b border-border text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -109,7 +183,10 @@ export default function RoutesAgentsPage() {
                       </td>
                       <td className="p-4">
                         {r.agent?.name ? (
-                          <span className="font-medium text-primary">{r.agent.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span className="font-medium text-primary">{r.agent.name}</span>
+                          </div>
                         ) : (
                           <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium">Unassigned</span>
                         )}
@@ -123,20 +200,60 @@ export default function RoutesAgentsPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wide ${
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${
                           r.status === 'IN_PROGRESS'
-                            ? 'bg-amber-100 text-amber-800'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
                             : r.status === 'COMPLETED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-gray-100 text-gray-700'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : 'bg-gray-100 text-gray-700 border border-gray-200'
                         }`}>
                           {r.status}
                         </span>
                       </td>
                       <td className="p-4 text-right">
-                        <Link href={`/routes/${r.id}`} className="text-accent text-xs font-bold hover:underline">
-                          View Details &rarr;
-                        </Link>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {r.status === 'PLANNED' && (
+                            <button
+                              onClick={() => handleQuickStatusChange(r.id, 'start')}
+                              disabled={actionLoading}
+                              className="px-2 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors"
+                              title="Start Route"
+                            >
+                              ▶ Start
+                            </button>
+                          )}
+                          {r.status === 'IN_PROGRESS' && (
+                            <button
+                              onClick={() => handleQuickStatusChange(r.id, 'complete')}
+                              disabled={actionLoading}
+                              className="px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors"
+                              title="Mark Complete"
+                            >
+                              ✓ Done
+                            </button>
+                          )}
+                          <Link
+                            href={`/routes/${r.id}`}
+                            className="px-2.5 py-1 text-xs font-bold text-primary bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Inspect details"
+                          >
+                            Stops &rarr;
+                          </Link>
+                          <button
+                            onClick={() => openEditModal(r)}
+                            className="px-2 py-1 text-xs font-bold text-primary hover:text-accent bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Edit Route"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={() => setRouteToDelete(r)}
+                            className="px-2 py-1 text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 rounded transition-colors"
+                            title="Delete Route"
+                          >
+                            🗑
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -190,7 +307,7 @@ export default function RoutesAgentsPage() {
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-sm uppercase ${agent.status === 'ACTIVE' ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-700'}`}>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase ${agent.status === 'ACTIVE' ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-700'}`}>
                         {agent.status || 'READY'}
                       </span>
                     </td>
@@ -212,6 +329,126 @@ export default function RoutesAgentsPage() {
           </table>
         </div>
       </div>
+
+      {/* Edit Route Modal */}
+      {editingRoute && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-border">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-serif font-bold text-xl text-primary">Edit Route Manifest</h3>
+              <button onClick={() => setEditingRoute(null)} className="text-gray-400 hover:text-gray-600 text-lg">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateRoute} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-text-muted mb-1 uppercase">Route Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Yeka Abado Morning Run"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full border border-border rounded-lg p-2.5 text-sm outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text-muted mb-1 uppercase">Dispatch Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={editForm.date}
+                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                  className="w-full border border-border rounded-lg p-2.5 text-sm outline-none focus:border-accent font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text-muted mb-1 uppercase">Assigned Field Agent</label>
+                <select
+                  value={editForm.agentId}
+                  onChange={(e) => setEditForm({ ...editForm, agentId: e.target.value })}
+                  className="w-full border border-border rounded-lg p-2.5 text-sm outline-none focus:border-accent bg-surface"
+                >
+                  <option value="">-- Unassigned --</option>
+                  {agents.map((ag) => (
+                    <option key={ag.id} value={ag.id}>
+                      {ag.user?.name || ag.name || 'Agent'} ({ag.vehiclePlate || 'Vehicle'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text-muted mb-1 uppercase">Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  className="w-full border border-border rounded-lg p-2.5 text-sm outline-none focus:border-accent bg-surface font-semibold"
+                >
+                  <option value="PLANNED">PLANNED (Upcoming)</option>
+                  <option value="IN_PROGRESS">IN_PROGRESS (On Road)</option>
+                  <option value="COMPLETED">COMPLETED (Finished)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4 pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setEditingRoute(null)}
+                  className="px-4 py-2 border border-border rounded-lg text-sm font-semibold hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="bg-accent text-primary-darker font-bold px-5 py-2 rounded-lg text-sm hover:bg-accent-light transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? 'Saving...' : 'Update Route'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Route Confirmation Modal */}
+      {routeToDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-surface rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-border">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl font-bold">
+                🗑
+              </div>
+              <h3 className="font-serif font-bold text-lg text-primary mb-1">Delete Route</h3>
+              <p className="text-text-muted text-xs mb-4">
+                Are you sure you want to delete <strong className="text-primary">{routeToDelete.name}</strong>? All {routeToDelete.stops?.length || 0} stop associations on this manifest will be removed.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRouteToDelete(null)}
+                className="flex-1 py-2 border border-border rounded-lg text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleDeleteRoute}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Deleting...' : 'Delete Route'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
