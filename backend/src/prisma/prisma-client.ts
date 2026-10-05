@@ -19,8 +19,11 @@ export function getPrismaClientOptions() {
   const url = databaseUrl();
   if (!shouldUseNeonAdapter(url)) return {};
 
-  // Neon Serverless adapter configuration to bypass VPN over WebSockets
   neonConfig.webSocketConstructor = ws;
   const pool = new Pool({ connectionString: url });
+  pool.on('error', (err) => {
+    console.warn('[Neon Pool] Recovering from idle connection drop:', err?.message || err);
+  });
   return { adapter: new PrismaNeon(pool as any) };
 }
+

@@ -57,13 +57,17 @@ export class RoutesService {
 
     // Attach outstanding loan balance dynamically for the MVP
     const stopsWithBalance = route.stops.map(stop => {
-      const outstandingBalance = stop.customer.invoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+      const outstandingBalance = stop.customer?.invoices
+        ? stop.customer.invoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
+        : 0;
       return {
         ...stop,
-        customer: {
-          ...stop.customer,
-          outstandingBalance
-        }
+        customer: stop.customer
+          ? {
+              ...stop.customer,
+              outstandingBalance,
+            }
+          : null,
       };
     });
 
@@ -115,7 +119,7 @@ export class RoutesService {
       : route.stops.find((s) => s.status === 'PENDING');
 
     if (!target) throw new NotFoundException('No pending stop to navigate to');
-    if (target.customer.lat == null || target.customer.lng == null) {
+    if (!target.customer || target.customer.lat == null || target.customer.lng == null) {
       throw new BadRequestException('This customer has no GPS coordinates on file');
     }
 
@@ -135,12 +139,12 @@ export class RoutesService {
    */
   async optimizeOrder(workspaceId: string, id: string, from: { lat: number; lng: number }) {
     const route = await this.findOne(workspaceId, id);
-    const pending = route.stops.filter((s) => s.status === 'PENDING' && s.customer.lat != null && s.customer.lng != null);
+    const pending = route.stops.filter((s) => s.status === 'PENDING' && s.customer?.lat != null && s.customer?.lng != null);
     if (pending.length < 2) return route;
 
     const order = await this.routing.optimizeStopOrder(
       from,
-      pending.map((s) => ({ lat: s.customer.lat!, lng: s.customer.lng! })),
+      pending.map((s) => ({ lat: s.customer!.lat!, lng: s.customer!.lng! })),
     );
     if (!order) throw new BadRequestException('Could not reach the routing service (OSRM)');
 
