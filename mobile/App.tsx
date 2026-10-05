@@ -19,35 +19,19 @@ export default function App() {
     </>
   );
 
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webContainer}>
-        <View style={styles.mobileFrame}>
-          {content}
-        </View>
-      </View>
-    );
-  }
-
-  return content;
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <AppNavigator />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  webContainer: {
-    flex: 1,
-    backgroundColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobileFrame: {
+  container: {
     flex: 1,
     width: '100%',
-    maxWidth: 480,
+    height: '100%',
     backgroundColor: '#ffffff',
-    ...(Platform.OS === 'web' ? {
-      boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-      maxHeight: 950,
-      overflow: 'hidden',
-    } : {}),
   },
 });

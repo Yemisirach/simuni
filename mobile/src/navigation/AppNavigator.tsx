@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -78,6 +78,9 @@ function MainTabNavigator() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E5E3',
+          height: Platform.OS === 'web' ? 64 : 56,
+          paddingBottom: Platform.OS === 'web' ? 8 : 4,
+          paddingTop: 6,
         },
         tabBarLabelStyle: {
           fontFamily: fontFamily.sans,

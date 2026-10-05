@@ -59,10 +59,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Check if file exists, fallback to index.html for SPA routing
+  // Check if file exists, fallback to PWA root files or index.html for SPA routing
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
-      filePath = path.join(DIST_DIR, 'index.html');
+      if (reqPath === '/manifest.json') filePath = path.join(__dirname, 'manifest.json');
+      else if (reqPath === '/sw.js') filePath = path.join(__dirname, 'sw.js');
+      else if (reqPath === '/icon-192.png') filePath = path.join(__dirname, 'assets', 'icon-192.png');
+      else if (reqPath === '/icon-512.png') filePath = path.join(__dirname, 'assets', 'icon-512.png');
+      else filePath = path.join(DIST_DIR, 'index.html');
     }
 
     const ext = path.extname(filePath).toLowerCase();
