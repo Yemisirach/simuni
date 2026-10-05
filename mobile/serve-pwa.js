@@ -10,6 +10,7 @@ const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',
   '.js': 'application/javascript; charset=UTF-8',
   '.json': 'application/json; charset=UTF-8',
+  '.webmanifest': 'application/manifest+json; charset=UTF-8',
   '.css': 'text/css; charset=UTF-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -47,22 +48,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Intercept sw.js to automatically flush old service worker caches
-  if (reqPath === '/sw.js') {
-    res.writeHead(200, {
-      'Content-Type': 'application/javascript; charset=UTF-8',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-    });
-    res.end(
-      `self.addEventListener('install', (e) => { self.skipWaiting(); });\n` +
-      `self.addEventListener('activate', (e) => {\n` +
-      `  e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => self.clients.claim()));\n` +
-      `});\n` +
-      `self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });`
-    );
-    return;
-  }
-
   if (reqPath === '/') reqPath = '/index.html';
 
   let filePath = path.join(DIST_DIR, reqPath);
@@ -94,21 +79,83 @@ const server = http.createServer((req, res) => {
       let outputData = data;
       if (isHtml) {
         let htmlStr = data.toString('utf8');
-        // Unregister any stale service workers and caches from previous sessions
-        const swCleaner = `<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    for (var r of regs) { r.unregister(); }
+
+        // Comprehensive PWA tags and fonts
+        const pwaHeaders = `
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1A1A1A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Simuni">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+`;
+
+        const pwaInstaller = `
+<!-- Simuni 1-Tap PWA Installer Banner -->
+<div id="simuni-install-banner" style="display:none; position:fixed; bottom:20px; left:16px; right:16px; max-width:440px; margin:0 auto; background:#1A1A1A; border:1px solid #C4A35A; border-radius:14px; padding:12px 16px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:999999; align-items:center; justify-content:space-between; font-family:-apple-system,BlinkMacSystemFont,Roboto,sans-serif;">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <img src="/icon-192.png" style="width:38px; height:38px; border-radius:8px; border:1px solid #C4A35A;">
+    <div>
+      <div style="font-weight:700; font-size:13px; color:#FFFFFF;">Install Simuni Agent</div>
+      <div style="font-size:11px; color:#A0A0A0;">Add to Home Screen as Native App</div>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <button id="simuni-install-btn" style="background:#C4A35A; color:#1A1A1A; border:none; border-radius:8px; padding:8px 14px; font-weight:700; font-size:12px; cursor:pointer;">Install</button>
+    <button id="simuni-install-close" style="background:transparent; color:#888; border:none; font-size:16px; cursor:pointer; padding:4px;">✕</button>
+  </div>
+</div>
+
+<script>
+  // Register Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((reg) => console.log('[Simuni PWA] Service worker active:', reg.scope))
+        .catch((err) => console.error('[Simuni PWA] Service worker failed:', err));
+    });
+  }
+
+  // Handle Chrome / Android PWA Installation Prompt
+  let simuniPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    simuniPrompt = e;
+    const banner = document.getElementById('simuni-install-banner');
+    if (banner) banner.style.display = 'flex';
   });
-}
-if ('caches' in window) {
-  caches.keys().then(function(names) {
-    for (var n of names) { caches.delete(n); }
+
+  document.getElementById('simuni-install-btn')?.addEventListener('click', async () => {
+    if (!simuniPrompt) return;
+    simuniPrompt.prompt();
+    const { outcome } = await simuniPrompt.userChoice;
+    console.log('[Simuni PWA] User response:', outcome);
+    simuniPrompt = null;
+    const banner = document.getElementById('simuni-install-banner');
+    if (banner) banner.style.display = 'none';
   });
-}
-</script>`;
-        const fontLinks = `<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">\n`;
-        htmlStr = htmlStr.replace('</head>', fontLinks + swCleaner + '</head>');
+
+  document.getElementById('simuni-install-close')?.addEventListener('click', () => {
+    const banner = document.getElementById('simuni-install-banner');
+    if (banner) banner.style.display = 'none';
+  });
+
+  window.addEventListener('appinstalled', () => {
+    const banner = document.getElementById('simuni-install-banner');
+    if (banner) banner.style.display = 'none';
+    console.log('[Simuni PWA] App successfully installed on device!');
+  });
+</script>
+`;
+
+        htmlStr = htmlStr.replace('</head>', pwaHeaders + '</head>');
+        htmlStr = htmlStr.replace('</body>', pwaInstaller + '</body>');
         // Cache bust script bundle references
         htmlStr = htmlStr.replace(/src="([^"]+\.js)"/g, 'src="$1?v=' + Date.now() + '"');
         outputData = Buffer.from(htmlStr, 'utf8');
@@ -116,10 +163,7 @@ if ('caches' in window) {
 
       res.writeHead(200, {
         'Content-Type': contentType,
-        // Never aggressively cache HTML/JS so updates apply immediately
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        'Cache-Control': filePath.endsWith('sw.js') ? 'no-cache, no-store, must-revalidate' : 'public, max-age=3600',
       });
       res.end(outputData);
     });
@@ -128,5 +172,5 @@ if ('caches' in window) {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Simuni Mobile PWA] Serving offline-installable app on http://0.0.0.0:${PORT}`);
-  console.log(`[Simuni Mobile PWA] On phone, open http://172.20.10.7:${PORT} and tap 'Install App' or 'Add to Home screen'`);
+  console.log(`[Simuni Mobile PWA] On Android phone, open http://172.20.10.7:${PORT} to install!`);
 });
