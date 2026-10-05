@@ -91,6 +91,88 @@ export class CustomersService {
     });
   }
 
+  /**
+   * Geospatial viewport fetch: returns customers located inside the active map bounding box.
+   * Also guarantees any specified `includeIds` (selected stops) are returned even if outside the box.
+   */
+  async findInViewport(
+    workspaceId: string,
+    params: {
+      minLat?: number;
+      maxLat?: number;
+      minLng?: number;
+      maxLng?: number;
+      limit?: number;
+      search?: string;
+      includeIds?: string[];
+    },
+  ) {
+    const wsId = await this.resolveWorkspaceId(workspaceId);
+    const limit = params.limit ? Math.min(Math.max(params.limit, 10), 1000) : 350;
+
+    const where: any = { workspaceId: wsId };
+
+    if (params.search && params.search.trim()) {
+      const q = params.search.trim();
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { address: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q } },
+      ];
+    }
+
+    if (
+      typeof params.minLat === 'number' &&
+      typeof params.maxLat === 'number' &&
+      typeof params.minLng === 'number' &&
+      typeof params.maxLng === 'number'
+    ) {
+      where.lat = { gte: params.minLat, lte: params.maxLat };
+      where.lng = { gte: params.minLng, lte: params.maxLng };
+    }
+
+    const viewportCustomers = await this.prisma.customer.findMany({
+      where,
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        address: true,
+        category: true,
+        lat: true,
+        lng: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (params.includeIds && params.includeIds.length > 0) {
+      const existingIds = new Set(viewportCustomers.map((c) => c.id));
+      const missingIds = params.includeIds.filter((id) => !existingIds.has(id));
+
+      if (missingIds.length > 0) {
+        const selectedCustomers = await this.prisma.customer.findMany({
+          where: {
+            workspaceId: wsId,
+            id: { in: missingIds },
+          },
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            address: true,
+            category: true,
+            lat: true,
+            lng: true,
+          },
+        });
+        return [...selectedCustomers, ...viewportCustomers];
+      }
+    }
+
+    return viewportCustomers;
+  }
+
   async findOne(workspaceId: string, id: string) {
     const customer = await this.prisma.customer.findFirst({ where: { id, workspaceId } });
     if (!customer) throw new NotFoundException('Customer not found');

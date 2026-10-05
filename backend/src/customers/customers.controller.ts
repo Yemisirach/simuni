@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
@@ -13,8 +13,50 @@ export class CustomersController {
     return this.customersService.create(user.workspaceId, dto);
   }
 
+  @Get('viewport')
+  findInViewport(
+    @CurrentUser() user,
+    @Query('minLat') minLat?: string,
+    @Query('maxLat') maxLat?: string,
+    @Query('minLng') minLng?: string,
+    @Query('maxLng') maxLng?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('includeIds') includeIds?: string,
+  ) {
+    return this.customersService.findInViewport(user.workspaceId, {
+      minLat: minLat ? parseFloat(minLat) : undefined,
+      maxLat: maxLat ? parseFloat(maxLat) : undefined,
+      minLng: minLng ? parseFloat(minLng) : undefined,
+      maxLng: maxLng ? parseFloat(maxLng) : undefined,
+      limit: limit ? parseInt(limit, 10) : 350,
+      search,
+      includeIds: includeIds ? includeIds.split(',').filter(Boolean) : undefined,
+    });
+  }
+
   @Get()
-  findAll(@CurrentUser() user) {
+  findAll(
+    @CurrentUser() user,
+    @Query('minLat') minLat?: string,
+    @Query('maxLat') maxLat?: string,
+    @Query('minLng') minLng?: string,
+    @Query('maxLng') maxLng?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('includeIds') includeIds?: string,
+  ) {
+    if (minLat || maxLat || minLng || maxLng || limit || search || includeIds) {
+      return this.customersService.findInViewport(user.workspaceId, {
+        minLat: minLat ? parseFloat(minLat) : undefined,
+        maxLat: maxLat ? parseFloat(maxLat) : undefined,
+        minLng: minLng ? parseFloat(minLng) : undefined,
+        maxLng: maxLng ? parseFloat(maxLng) : undefined,
+        limit: limit ? parseInt(limit, 10) : 350,
+        search,
+        includeIds: includeIds ? includeIds.split(',').filter(Boolean) : undefined,
+      });
+    }
     return this.customersService.findAll(user.workspaceId);
   }
 

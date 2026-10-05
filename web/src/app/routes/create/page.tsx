@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { fetchApi } from '@/lib/api';
@@ -16,12 +16,92 @@ export default function CreateRoutePage() {
   const [clusterFilter, setClusterFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isLoadingViewport, setIsLoadingViewport] = useState(false);
   const router = useRouter();
 
+  // Initial load: fetch agents and initial central Addis viewport stops
   useEffect(() => {
     fetchApi<any[]>('/agents').then(setAgents).catch(console.error);
-    fetchApi<any[]>('/customers').then(setCustomers).catch(console.error);
+    
+    // Initial viewport fetch for central / Yeka corridor (~300 stops instead of whole 3,400+ DB)
+    const initQs = new URLSearchParams({
+      minLat: '9.00000',
+      maxLat: '9.06000',
+      minLng: '38.72000',
+      maxLng: '38.86000',
+      limit: '350',
+    });
+    fetchApi<any[]>(`/customers/viewport?${initQs.toString()}`)
+      .then((data) => setCustomers(data))
+      .catch((err) => {
+        console.error('Failed initial viewport fetch, falling back:', err);
+        fetchApi<any[]>('/customers').then(setCustomers).catch(console.error);
+      });
   }, []);
+
+  // Geospatial Viewport Fetch: fetches only the shops within the current map bounding box
+  const handleViewportFetch = useCallback(
+    async (vp: { minLat: number; maxLat: number; minLng: number; maxLng: number; zoom: number }) => {
+      setIsLoadingViewport(true);
+      try {
+        const qs = new URLSearchParams({
+          minLat: vp.minLat.toFixed(5),
+          maxLat: vp.maxLat.toFixed(5),
+          minLng: vp.minLng.toFixed(5),
+          maxLng: vp.maxLng.toFixed(5),
+          limit: '350',
+        });
+
+        if (selectedCustomers.length > 0) {
+          qs.set('includeIds', selectedCustomers.join(','));
+        }
+
+        const data = await fetchApi<any[]>(`/customers/viewport?${qs.toString()}`);
+
+        // Merge incoming viewport stops into local cache so previously seen and selected stops persist
+        setCustomers((prev) => {
+          const map = new Map<string, any>(prev.map((c) => [c.id, c]));
+          for (const item of data) {
+            map.set(item.id, item);
+          }
+          return Array.from(map.values());
+        });
+      } catch (err) {
+        console.error('Error in viewport fetch:', err);
+      } finally {
+        setIsLoadingViewport(false);
+      }
+    },
+    [selectedCustomers],
+  );
+
+  // Debounced database search: query backend when searching across the entire city database
+  useEffect(() => {
+    if (!searchTerm || searchTerm.trim().length < 2) return;
+    const timer = setTimeout(async () => {
+      try {
+        const qs = new URLSearchParams({
+          search: searchTerm.trim(),
+          limit: '150',
+        });
+        if (selectedCustomers.length > 0) {
+          qs.set('includeIds', selectedCustomers.join(','));
+        }
+        const searchResults = await fetchApi<any[]>(`/customers/viewport?${qs.toString()}`);
+        setCustomers((prev) => {
+          const map = new Map<string, any>(prev.map((c) => [c.id, c]));
+          for (const item of searchResults) {
+            map.set(item.id, item);
+          }
+          return Array.from(map.values());
+        });
+      } catch (err) {
+        console.error('Error searching customers:', err);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, selectedCustomers]);
 
   // Filter customers by search term and cluster
   const filteredCustomers = useMemo(() => {
@@ -309,13 +389,14 @@ export default function CreateRoutePage() {
         {/* Right Column: Spatial Geofencing & Map Picker */}
         <div className="lg:col-span-7 flex flex-col h-[650px] sticky top-20">
           <div className="bg-surface p-3 border border-border border-b-0 rounded-t-xl flex justify-between items-center bg-gray-50">
-            <div>
-              <h3 className="font-bold text-sm text-primary flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-primary flex items-center gap-1.5">
                 <span>🗺️ Interactive Geofence Map</span>
-                <span className="text-xs font-normal text-text-muted">
-                  (Pin Circle or Rectangle to Select Stops)
-                </span>
               </h3>
+              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Viewport Stream ({customers.length} Loaded)</span>
+              </div>
             </div>
             <span className="text-xs font-mono font-bold text-primary bg-white px-2.5 py-1 border border-border rounded-lg shadow-xs">
               {selectedCustomers.length} Stops Pinned
@@ -328,6 +409,8 @@ export default function CreateRoutePage() {
               selectedCustomerIds={selectedCustomers}
               onToggleCustomer={toggleCustomer}
               onSelectMultiple={handleSelectMultiple}
+              onViewportFetch={handleViewportFetch}
+              isLoadingViewport={isLoadingViewport}
             />
           </div>
         </div>

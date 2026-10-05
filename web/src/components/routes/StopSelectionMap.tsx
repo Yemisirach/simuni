@@ -21,6 +21,8 @@ interface StopSelectionMapProps {
   selectedCustomerIds: string[];
   onToggleCustomer: (id: string) => void;
   onSelectMultiple: (ids: string[], mode: 'add' | 'replace' | 'remove') => void;
+  onViewportFetch?: (viewport: { minLat: number; maxLat: number; minLng: number; maxLng: number; zoom: number }) => void;
+  isLoadingViewport?: boolean;
 }
 
 // Haversine formula to compute distance in meters between two coordinates
@@ -157,6 +159,8 @@ export default function StopSelectionMap({
   selectedCustomerIds,
   onToggleCustomer,
   onSelectMultiple,
+  onViewportFetch,
+  isLoadingViewport = false,
 }: StopSelectionMapProps) {
   // Addis Ababa default center
   const defaultCenter: [number, number] = [9.0227, 38.7469];
@@ -167,6 +171,10 @@ export default function StopSelectionMap({
   const [currentZoom, setCurrentZoom] = useState<number>(13);
   const [currentBounds, setCurrentBounds] = useState<L.LatLngBounds | null>(null);
   const [densityMode, setDensityMode] = useState<'SMART' | 'ALL'>('SMART');
+
+  // Viewport fetch debounce tracking
+  const lastFetchedBoundsRef = React.useRef<string>('');
+  const fetchTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Map Layer: 'SATELLITE' (default) vs 'STREET'
   const [mapLayer, setMapLayer] = useState<'SATELLITE' | 'STREET'>('SATELLITE');
@@ -190,11 +198,47 @@ export default function StopSelectionMap({
     return customers.filter(c => typeof c.lat === 'number' && typeof c.lng === 'number');
   }, [customers]);
 
+  // Debounced Viewport Fetcher
+  const triggerViewportFetch = useCallback(
+    (zoom: number, bounds: L.LatLngBounds) => {
+      if (!onViewportFetch) return;
+      const minLat = bounds.getSouth();
+      const maxLat = bounds.getNorth();
+      const minLng = bounds.getWest();
+      const maxLng = bounds.getEast();
+
+      // Precision to avoid duplicate requests for micro pixel jitter
+      const boundsKey = `${minLat.toFixed(3)},${maxLat.toFixed(3)},${minLng.toFixed(3)},${maxLng.toFixed(3)},${zoom}`;
+      if (lastFetchedBoundsRef.current === boundsKey) return;
+
+      if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
+      fetchTimerRef.current = setTimeout(() => {
+        lastFetchedBoundsRef.current = boundsKey;
+        onViewportFetch({ minLat, maxLat, minLng, maxLng, zoom });
+      }, 300);
+    },
+    [onViewportFetch],
+  );
+
+  // Manual trigger for current bounds
+  const handleForceRefetch = useCallback(() => {
+    if (onViewportFetch && currentBounds) {
+      onViewportFetch({
+        minLat: currentBounds.getSouth(),
+        maxLat: currentBounds.getNorth(),
+        minLng: currentBounds.getWest(),
+        maxLng: currentBounds.getEast(),
+        zoom: currentZoom,
+      });
+    }
+  }, [onViewportFetch, currentBounds, currentZoom]);
+
   // Viewport change handler
   const handleViewportChange = useCallback((zoom: number, bounds: L.LatLngBounds) => {
     setCurrentZoom(zoom);
     setCurrentBounds(bounds);
-  }, []);
+    triggerViewportFetch(zoom, bounds);
+  }, [triggerViewportFetch]);
 
   // Filter and scale pins based on viewport bounds and zoom level ("Scale View")
   const displayedCustomers = useMemo(() => {
@@ -521,10 +565,27 @@ export default function StopSelectionMap({
           </div>
         </div>
 
-        {/* Density Mode Switcher */}
+        {/* Density Mode Switcher & Viewport Fetch Indicator */}
         <div className="flex items-center gap-2">
+          {isLoadingViewport ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-900 text-[11px] font-bold border border-amber-300 shadow-xs animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+              <span>Fetching Viewport Stops…</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleForceRefetch}
+              title="Click to re-fetch stops inside current map viewport"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-white border border-border text-text-muted hover:text-primary hover:border-accent transition-colors cursor-pointer"
+            >
+              <span>⚡ Viewport Stream</span>
+              <span className="text-[10px] text-emerald-600 font-mono font-bold">● Live</span>
+            </button>
+          )}
+
           <span className="text-[11px] text-text-muted">
-            Rendering <strong>{displayedCustomers.length}</strong> stops in viewport
+            Rendering <strong>{displayedCustomers.length}</strong> stops in view
           </span>
           <div className="flex items-center bg-white border border-border rounded-lg p-0.5 text-[11px]">
             <button
