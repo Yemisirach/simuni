@@ -251,61 +251,113 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Quick Tagged Locations Chip Bar */}
-      <div className="bg-surface border border-border rounded-xl p-3 shadow-xs flex items-center justify-between gap-3 overflow-x-auto text-xs">
-        <div className="flex items-center gap-1.5 whitespace-nowrap">
+      {/* Quick Tagged Categories & Locations Chip Bar */}
+      <div className="bg-surface border border-border rounded-xl p-3 shadow-xs flex flex-col gap-2 text-xs">
+        {/* Categories / Types */}
+        <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
           <span className="font-bold text-primary flex items-center gap-1">
-            <span>📍</span> Tagged Hubs:
+            <span>🏷️</span> Types:
           </span>
           <button
-            onClick={() => {
-              setSearch('Yeka');
-            }}
-            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+            onClick={() => setSearch('Mall')}
+            className={`px-2.5 py-1 rounded-full font-bold transition-colors ${
+              search === 'Mall' ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-primary'
+            }`}
           >
-            Yeka / Abado (6)
+            🏢 Shopping Malls (8)
           </button>
           <button
-            onClick={() => {
-              setSearch('Mercato');
-            }}
-            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+            onClick={() => setSearch('Hotel')}
+            className={`px-2.5 py-1 rounded-full font-bold transition-colors ${
+              search === 'Hotel' ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-primary'
+            }`}
           >
-            Mercato / Autobis Tera (5)
+            🏨 Hotels & Fine Dining (8)
           </button>
           <button
-            onClick={() => {
-              setSearch('Bole');
-            }}
-            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+            onClick={() => setSearch('Restaurant')}
+            className={`px-2.5 py-1 rounded-full font-bold transition-colors ${
+              search === 'Restaurant' ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-primary'
+            }`}
           >
-            Bole / Atlas / Gerji (5)
+            🍽️ Restaurants & Traditional (6)
           </button>
           <button
-            onClick={() => {
-              setSearch('Lebu');
-            }}
-            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+            onClick={() => setSearch('Coffee')}
+            className={`px-2.5 py-1 rounded-full font-bold transition-colors ${
+              search === 'Coffee' ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-primary'
+            }`}
           >
-            Lebu / Jemo (3)
+            ☕ Cafes & Pastries (7)
           </button>
           <button
-            onClick={() => {
-              setSearch('Piazza');
-            }}
-            className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors"
+            onClick={() => setSearch('Hospital')}
+            className={`px-2.5 py-1 rounded-full font-bold transition-colors ${
+              search === 'Hospital' ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-primary'
+            }`}
           >
-            Piazza / Churchill (5)
+            🏛️ Institutions, Univ & Hospitals (8)
+          </button>
+          <button
+            onClick={() => setSearch('Supermarket')}
+            className={`px-2.5 py-1 rounded-full font-bold transition-colors ${
+              search === 'Supermarket' ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-primary'
+            }`}
+          >
+            🛒 Supermarkets (9)
           </button>
         </div>
-        {search && (
+
+        {/* Corridor Sectors */}
+        <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pt-1 border-t border-border/60">
+          <span className="font-bold text-text-muted flex items-center gap-1">
+            <span>📍</span> Corridors:
+          </span>
           <button
-            onClick={() => setSearch('')}
-            className="text-accent font-bold text-xs whitespace-nowrap hover:underline"
+            onClick={() => setSearch('Yeka')}
+            className="px-2.5 py-0.5 rounded-full bg-gray-50 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors text-[11px]"
           >
-            Show All
+            Yeka / Abado / CMC
           </button>
-        )}
+          <button
+            onClick={() => setSearch('Bole')}
+            className="px-2.5 py-0.5 rounded-full bg-gray-50 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors text-[11px]"
+          >
+            Bole / Atlas / Medhanialem
+          </button>
+          <button
+            onClick={() => setSearch('Mercato')}
+            className="px-2.5 py-0.5 rounded-full bg-gray-50 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors text-[11px]"
+          >
+            Mercato / Autobis Tera
+          </button>
+          <button
+            onClick={() => setSearch('Kirkos')}
+            className="px-2.5 py-0.5 rounded-full bg-gray-50 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors text-[11px]"
+          >
+            Kirkos / Kazanchis / Meskel Sq
+          </button>
+          <button
+            onClick={() => setSearch('Piazza')}
+            className="px-2.5 py-0.5 rounded-full bg-gray-50 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors text-[11px]"
+          >
+            Piazza / Arada
+          </button>
+          <button
+            onClick={() => setSearch('Lebu')}
+            className="px-2.5 py-0.5 rounded-full bg-gray-50 hover:bg-gray-200 font-semibold text-text-muted hover:text-primary transition-colors text-[11px]"
+          >
+            Lebu / Jemo
+          </button>
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="text-accent font-bold text-xs whitespace-nowrap hover:underline ml-auto"
+            >
+              Show All ({customers.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter / Search Bar */}
@@ -440,33 +492,43 @@ export default function CustomersPage() {
               >
                 <option value="">-- Choose a Tagged Location or Type Manually --</option>
                 <option value="central-hub">📍 Central Addis Hub (Piazza / Churchill Ave)</option>
-                <optgroup label="Yeka / East Hubs">
-                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.sector === 'YEKA').map((l) => (
+                <optgroup label="🏢 Shopping Malls & Commercial Centers">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.type === 'MALL').map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name} ({l.subCity})
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="Mercato / West Hubs">
-                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.sector === 'MERCATO' || l.sector === 'KOLFE').map(
-                    (l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name} ({l.subCity})
-                      </option>
-                    )
-                  )}
-                </optgroup>
-                <optgroup label="Bole / South-East Hubs">
-                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.sector === 'BOLE').map((l) => (
+                <optgroup label="🏨 Hotels & Fine Dining">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.type === 'HOTEL_RESTAURANT').map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name} ({l.subCity})
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="Central & Southern Hubs (Kirkos, Arada, Lebu)">
-                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter(
-                    (l) => l.sector === 'CENTRAL' || l.sector === 'ARADA' || l.sector === 'LEBU' || l.sector === 'AKAKI'
-                  ).map((l) => (
+                <optgroup label="☕ Cafes, Roasteries & Pastries">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.type === 'CAFE').map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.subCity})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏛️ Institutions, Universities & Hospitals">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.type === 'INSTITUTION').map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.subCity})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🛒 Supermarkets & Groceries">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.type === 'SUPERMARKET').map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.subCity})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="📦 Wholesale & Major Market Hubs">
+                  {ADDIS_ABABA_TAGGED_LOCATIONS.filter((l) => l.type === 'WHOLESALE' || l.type === 'RETAILER').map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name} ({l.subCity})
                     </option>
