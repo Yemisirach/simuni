@@ -235,8 +235,29 @@ export class ReportsService {
         : Math.max(0, openingStock + recordedFactoryInflow - packQty);
 
       // Pricing
-      const sellingPrice = snapshotVariant?.sellingPrice !== undefined ? Number(snapshotVariant.sellingPrice) : (orderAgg && orderAgg.packQty > 0 ? orderAgg.salesAmount / orderAgg.packQty : Number(p.price));
-      const factoryPrice = snapshotVariant?.factoryPrice !== undefined ? Number(snapshotVariant.factoryPrice) : Number(p.factoryPrice || 0);
+      const pName = (p.name || '').toLowerCase();
+      const isNewPriceTier = day >= '2026-10-02';
+      const defaultNewFactoryPrice = (pName.includes('0.6') || pName.includes('2')) ? 270 : 220;
+      const defaultPrevFactoryPrice = pName.includes('0.35') ? 172 : (pName.includes('1') ? 174 : 220);
+
+      const sellingPrice = snapshotVariant?.sellingPrice !== undefined
+        ? Number(snapshotVariant.sellingPrice)
+        : (orderAgg && orderAgg.packQty > 0 ? orderAgg.salesAmount / orderAgg.packQty : Number(p.price));
+
+      let factoryPrice: number;
+      if (snapshotVariant?.factoryPrice !== undefined) {
+        const snapPrice = Number(snapshotVariant.factoryPrice);
+        // From Friday 2026-10-02 onward, old previous buy prices must not be used
+        factoryPrice = isNewPriceTier && (snapPrice === 172 || snapPrice === 174 || (snapPrice === 220 && (pName.includes('0.6') || pName.includes('2'))))
+          ? defaultNewFactoryPrice
+          : snapPrice;
+      } else if (isNewPriceTier) {
+        factoryPrice = defaultNewFactoryPrice;
+      } else if (day <= '2026-09-29') {
+        factoryPrice = defaultPrevFactoryPrice;
+      } else {
+        factoryPrice = Number(p.factoryPrice || defaultNewFactoryPrice);
+      }
 
       const salesAmount = packQty * sellingPrice;
       const costAmount = packQty * factoryPrice;
@@ -283,10 +304,11 @@ export class ReportsService {
 
     // 8. Compute Warehouse available product reserves (New vs Previous price) up to active day
     // Factory purchase history by variant:
-    // 0.35L: 0 prev (172 ETB), 0 new (220 ETB)
-    // 0.60L: 450 pk @ 220 ETB (Prev), Orders 3 & 5: 370 pk @ 270 ETB (New)
-    // 1.00L: 500 pk @ 174 ETB (Prev), Order 5: 150 pk @ 220 ETB (New)
-    // 2.00L: 420 pk @ 220 ETB (Prev), Order 3, 4 & 5: 680 pk @ 270 ETB (New)
+    // 0.35L: 0 prev (172 ETB), 250 new (220 ETB)
+    // 0.60L: 450 pk @ 220 ETB (Prev), 285 pk @ 270 ETB (New)
+    // 1.00L: 500 pk @ 174 ETB (Prev), 250 pk @ 220 ETB (New)
+    // 2.00L: 420 pk @ 220 ETB (Prev), 1,200 pk @ 270 ETB (New)
+    // Total previous-price store stock: 450 + 500 + 420 = 1,370 packs, fully finalized by Thursday (2026-10-01).
     const allSnapshotDates = Object.keys(snapshots)
       .filter((d) => d <= day)
       .sort();
@@ -324,12 +346,12 @@ export class ReportsService {
         prevBuy = 220;
         newBuy = 270;
         totalPrevPurchased = 450;
-        totalNewPurchased = day >= '2026-10-03' ? 470 : (day >= '2026-10-02' ? 370 : (day >= '2026-09-30' ? 170 : 0));
+        totalNewPurchased = day >= '2026-10-03' ? 285 : (day >= '2026-10-02' ? 285 : (day >= '2026-10-01' ? 85 : (day >= '2026-09-30' ? 15 : 0)));
       } else if (name.includes('1') && !name.includes('0.35') && !name.includes('0.6')) {
         prevBuy = 174;
         newBuy = 220;
         totalPrevPurchased = 500;
-        totalNewPurchased = day >= '2026-10-02' ? 150 : 0;
+        totalNewPurchased = day >= '2026-10-02' ? 250 : (day >= '2026-10-01' ? 100 : 0);
       } else if (name.includes('2')) {
         prevBuy = 220;
         newBuy = 270;
@@ -351,8 +373,13 @@ export class ReportsService {
       const storeStock = Math.max(0, totalAvailable - vanRemaining);
 
       // FIFO breakdown for Store Stock:
-      // Cumulative loaded onto van or sold comes first from prevBuy, then newBuy
-      const remainingPrevStock = Math.min(storeStock, Math.max(0, totalPrevPurchased - cumSold));
+      // The 1,370 packs purchased at previous price (0.60L: 450, 1.00L: 500, 2.00L: 420)
+      // are finalized and fully depleted by Thursday (2026-10-01).
+      // From Friday (2026-10-02) onward, previous-price store stock is 0, and all store inventory is 100% new stock.
+      const isPastPreviousPriceCutoff = day >= '2026-10-02';
+      const remainingPrevStock = isPastPreviousPriceCutoff
+        ? 0
+        : Math.min(storeStock, Math.max(0, totalPrevPurchased - cumSold));
       const remainingNewStock = Math.max(0, storeStock - remainingPrevStock);
 
       return {

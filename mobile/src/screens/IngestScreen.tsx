@@ -405,23 +405,23 @@ export default function IngestScreen() {
         prevPrice = 172;
         newPrice = 220;
         prevStock = 0;
-        newStock = date >= '2026-10-03' ? 0 : 0;
+        newStock = 0;
       } else if (name.includes('0.6')) {
         prevPrice = 220;
         newPrice = 270;
-        // 450 bought @ 220; sold across week
-        prevStock = date >= '2026-10-03' ? 0 : (date >= '2026-10-02' ? 0 : (date >= '2026-10-01' ? 67 : (date >= '2026-09-30' ? 139 : 271)));
+        // 450 bought @ 220; finalized by Thursday
+        prevStock = date >= '2026-10-02' ? 0 : (date >= '2026-10-01' ? 67 : (date >= '2026-09-30' ? 139 : 271));
         newStock = date >= '2026-10-03' ? 272 : (date >= '2026-10-02' ? 233 : (date >= '2026-10-01' ? 4 : (date >= '2026-09-30' ? 76 : 0)));
       } else if (name.includes('1') && !name.includes('0.35') && !name.includes('0.6')) {
         prevPrice = 174;
         newPrice = 220;
-        // 500 bought @ 174; sold across week
-        prevStock = date >= '2026-10-02' ? 143 : (date >= '2026-10-01' ? 208 : (date >= '2026-09-30' ? 308 : 378));
-        newStock = date >= '2026-10-02' ? 150 : 0;
+        // 500 bought @ 174; finalized by Thursday
+        prevStock = date >= '2026-10-02' ? 0 : (date >= '2026-10-01' ? 208 : (date >= '2026-09-30' ? 308 : 378));
+        newStock = date >= '2026-10-02' ? 85 : 0;
       } else if (name.includes('2')) {
         prevPrice = 220;
         newPrice = 270;
-        // 420 bought @ 220 (all sold by Thu); store stock: 66 pk (Fri/active), van: 300 pk
+        // 420 bought @ 220; finalized by Thursday
         prevStock = 0;
         newStock = date >= '2026-10-03' ? 66 : (date >= '2026-10-02' ? 0 : (date >= '2026-10-01' ? 103 : (date >= '2026-09-30' ? 30 : 0)));
       }
