@@ -382,8 +382,12 @@ export class ReportsService {
         prevBuy = 220;
         newBuy = 270;
         // The 420 packs bought @ 220 ETB were finalized by Wednesday (2026-09-30).
-        // Orders: #3 (400 pk), #4 (250 pk), #5 (250 pk), #6 (300 pk). Net in store:
-        if (day >= '2026-10-03') {
+        // Orders: #3 (400 pk), #4 (250 pk), #5 (250 pk), #6 (300 pk).
+        // On 2026-10-06, the remaining 66 pk in store was loaded onto the van (58 opening + 66 loaded = 124 pk sold, stock empty).
+        if (day >= '2026-10-06') {
+          prevStock = 0;
+          newStock = 0;
+        } else if (day >= '2026-10-03') {
           prevStock = 0;
           newStock = 66;
         } else if (day >= '2026-10-02') {

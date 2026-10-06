@@ -444,7 +444,11 @@ export default function IngestScreen() {
         prevPrice = 220;
         newPrice = 270;
         // 420 bought @ 220; finalized by Wednesday
-        if (date >= '2026-10-03') {
+        // On 2026-10-06, 66 pk loaded into van from store (58 opening + 66 loaded = 124 sold, store empty)
+        if (date >= '2026-10-06') {
+          prevStock = 0;
+          newStock = 0;
+        } else if (date >= '2026-10-03') {
           prevStock = 0;
           newStock = 66;
         } else if (date >= '2026-10-02') {
