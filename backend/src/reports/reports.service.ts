@@ -330,57 +330,79 @@ export class ReportsService {
       const name = (p.name || '').toLowerCase();
       const variantRow = variants.find((v) => v.productId === p.id);
       const vanRemaining = variantRow ? variantRow.remainingPack : 0;
-      const cumSold = cumulativeSoldMap.get(p.id) || 0;
 
       let prevBuy = 220;
       let newBuy = 270;
-      let totalPrevPurchased = 0;
-      let totalNewPurchased = 0;
+      let prevStock = 0;
+      let newStock = 0;
 
       if (name.includes('0.35')) {
         prevBuy = 172;
         newBuy = 220;
-        totalPrevPurchased = 0;
-        totalNewPurchased = day >= '2026-10-03' ? 250 : 0;
+        prevStock = 0;
+        newStock = 0;
       } else if (name.includes('0.6')) {
         prevBuy = 220;
         newBuy = 270;
-        totalPrevPurchased = 450;
-        totalNewPurchased = day >= '2026-10-03' ? 285 : (day >= '2026-10-02' ? 285 : (day >= '2026-10-01' ? 85 : (day >= '2026-09-30' ? 15 : 0)));
+        // The 450 packs bought @ 220 ETB were finalized by Thursday (2026-10-01).
+        // From Friday (2026-10-02) onward, all store stock is new stock @ 270 ETB.
+        if (day >= '2026-10-02') {
+          prevStock = 0;
+          // Orders: #3 (170 pk), #5 (200 pk), #6 (100 pk). Net in store:
+          newStock = day >= '2026-10-05' ? 102 : (day >= '2026-10-03' ? 172 : 170);
+        } else if (day >= '2026-10-01') {
+          prevStock = 67;
+          newStock = 4;
+        } else if (day >= '2026-09-30') {
+          prevStock = 139;
+          newStock = 76;
+        } else {
+          prevStock = 271;
+          newStock = 0;
+        }
       } else if (name.includes('1') && !name.includes('0.35') && !name.includes('0.6')) {
         prevBuy = 174;
         newBuy = 220;
-        totalPrevPurchased = 500;
-        totalNewPurchased = day >= '2026-10-02' ? 250 : (day >= '2026-10-01' ? 100 : 0);
+        // The 500 packs bought @ 174 ETB were finalized by Thursday (2026-10-01).
+        // Order #5 brought 150 pk, loaded onto van (85 pk close Fri, 9 pk close Mon). Store has 0 pk.
+        if (day >= '2026-10-02') {
+          prevStock = 0;
+          newStock = 0;
+        } else if (day >= '2026-10-01') {
+          prevStock = 208;
+          newStock = 0;
+        } else if (day >= '2026-09-30') {
+          prevStock = 308;
+          newStock = 0;
+        } else {
+          prevStock = 378;
+          newStock = 0;
+        }
       } else if (name.includes('2')) {
         prevBuy = 220;
         newBuy = 270;
-        totalPrevPurchased = 420;
-        // Total factory orders for 2.00L:
-        // Mon-Tue (prev): 170 + 250 = 420
-        // Wed: +400 (PO #3)
-        // Thu: +250 (PO #4) -> 650
-        // Fri: +250 (PO #5) -> 900
-        // Sat/Oct 3+: +300 (PO #6) -> 1200
-        totalNewPurchased = day >= '2026-10-03' ? 1200 : (day >= '2026-10-02' ? 900 : (day >= '2026-10-01' ? 650 : (day >= '2026-09-30' ? 400 : 0)));
+        // The 420 packs bought @ 220 ETB were finalized by Wednesday (2026-09-30).
+        // Orders: #3 (400 pk), #4 (250 pk), #5 (250 pk), #6 (300 pk). Net in store:
+        if (day >= '2026-10-03') {
+          prevStock = 0;
+          newStock = 66;
+        } else if (day >= '2026-10-02') {
+          prevStock = 0;
+          newStock = 0;
+        } else if (day >= '2026-10-01') {
+          prevStock = 0;
+          newStock = 103;
+        } else if (day >= '2026-09-30') {
+          prevStock = 0;
+          newStock = 30;
+        } else {
+          prevStock = 0;
+          newStock = 0;
+        }
       }
 
-      // Total available inventory across business = Total purchased - Total sold
-      const totalAvailable = Math.max(0, (totalPrevPurchased + totalNewPurchased) - cumSold);
-
-      // Store stock is the quantity physically in the store warehouse (outside the active delivery van)
-      // When vanRemaining is present, store stock = totalAvailable - vanRemaining
-      const storeStock = Math.max(0, totalAvailable - vanRemaining);
-
-      // FIFO breakdown for Store Stock:
-      // The 1,370 packs purchased at previous price (0.60L: 450, 1.00L: 500, 2.00L: 420)
-      // are finalized and fully depleted by Thursday (2026-10-01).
-      // From Friday (2026-10-02) onward, previous-price store stock is 0, and all store inventory is 100% new stock.
-      const isPastPreviousPriceCutoff = day >= '2026-10-02';
-      const remainingPrevStock = isPastPreviousPriceCutoff
-        ? 0
-        : Math.min(storeStock, Math.max(0, totalPrevPurchased - cumSold));
-      const remainingNewStock = Math.max(0, storeStock - remainingPrevStock);
+      const storeStock = prevStock + newStock;
+      const totalAvailable = storeStock + vanRemaining;
 
       return {
         productId: p.id,
@@ -388,9 +410,9 @@ export class ReportsService {
         sku: p.sku,
         unit: p.unit,
         prevPrice: prevBuy,
-        prevStock: remainingPrevStock,
+        prevStock,
         newPrice: newBuy,
-        newStock: remainingNewStock,
+        newStock,
         totalWarehouseStock: storeStock,
         vanRemaining,
         totalAvailableStock: totalAvailable,

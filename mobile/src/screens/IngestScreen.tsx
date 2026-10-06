@@ -410,20 +410,56 @@ export default function IngestScreen() {
         prevPrice = 220;
         newPrice = 270;
         // 450 bought @ 220; finalized by Thursday
-        prevStock = date >= '2026-10-02' ? 0 : (date >= '2026-10-01' ? 67 : (date >= '2026-09-30' ? 139 : 271));
-        newStock = date >= '2026-10-03' ? 272 : (date >= '2026-10-02' ? 233 : (date >= '2026-10-01' ? 4 : (date >= '2026-09-30' ? 76 : 0)));
+        if (date >= '2026-10-02') {
+          prevStock = 0;
+          newStock = date >= '2026-10-05' ? 102 : (date >= '2026-10-03' ? 172 : 170);
+        } else if (date >= '2026-10-01') {
+          prevStock = 67;
+          newStock = 4;
+        } else if (date >= '2026-09-30') {
+          prevStock = 139;
+          newStock = 76;
+        } else {
+          prevStock = 271;
+          newStock = 0;
+        }
       } else if (name.includes('1') && !name.includes('0.35') && !name.includes('0.6')) {
         prevPrice = 174;
         newPrice = 220;
         // 500 bought @ 174; finalized by Thursday
-        prevStock = date >= '2026-10-02' ? 0 : (date >= '2026-10-01' ? 208 : (date >= '2026-09-30' ? 308 : 378));
-        newStock = date >= '2026-10-02' ? 85 : 0;
+        if (date >= '2026-10-02') {
+          prevStock = 0;
+          newStock = 0;
+        } else if (date >= '2026-10-01') {
+          prevStock = 208;
+          newStock = 0;
+        } else if (date >= '2026-09-30') {
+          prevStock = 308;
+          newStock = 0;
+        } else {
+          prevStock = 378;
+          newStock = 0;
+        }
       } else if (name.includes('2')) {
         prevPrice = 220;
         newPrice = 270;
-        // 420 bought @ 220; finalized by Thursday
-        prevStock = 0;
-        newStock = date >= '2026-10-03' ? 66 : (date >= '2026-10-02' ? 0 : (date >= '2026-10-01' ? 103 : (date >= '2026-09-30' ? 30 : 0)));
+        // 420 bought @ 220; finalized by Wednesday
+        if (date >= '2026-10-03') {
+          prevStock = 0;
+          newStock = 66;
+        } else if (date >= '2026-10-02') {
+          prevStock = 0;
+          newStock = 0;
+        } else if (date >= '2026-10-01') {
+          prevStock = 0;
+          newStock = 103;
+        } else if (date >= '2026-09-30') {
+          prevStock = 0;
+          newStock = 30;
+        } else {
+          prevStock = 0;
+          newStock = 0;
+        }
       }
 
       const totalWarehouseStock = prevStock + newStock;
