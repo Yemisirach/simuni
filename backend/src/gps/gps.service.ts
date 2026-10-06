@@ -19,14 +19,41 @@ export class GpsService {
   constructor(private prisma: PrismaService) {}
 
   async recordPing(point: LocationPoint) {
+    if (!point.agentId) return;
+
+    // Check if routeId is valid before setting foreign key constraint
+    let validRouteId: string | undefined = undefined;
+    if (point.routeId) {
+      const route = await this.prisma.route.findUnique({
+        where: { id: point.routeId },
+        select: { id: true },
+      });
+      if (route) validRouteId = route.id;
+    }
+
     await Promise.all([
       this.prisma.gpsLog.create({
-        data: { agentId: point.agentId, routeId: point.routeId, lat: point.lat, lng: point.lng },
-      }),
-      this.prisma.agentProfile.update({
+        data: {
+          agentId: point.agentId,
+          routeId: validRouteId,
+          lat: point.lat,
+          lng: point.lng,
+        },
+      }).catch((e) => console.error('Failed to log GPS ping:', e.message)),
+      this.prisma.agentProfile.upsert({
         where: { userId: point.agentId },
-        data: { lastLat: point.lat, lastLng: point.lng, isOnline: true },
-      }),
+        create: {
+          userId: point.agentId,
+          lastLat: point.lat,
+          lastLng: point.lng,
+          isOnline: true,
+        },
+        update: {
+          lastLat: point.lat,
+          lastLng: point.lng,
+          isOnline: true,
+        },
+      }).catch((e) => console.error('Failed to update agent profile position:', e.message)),
     ]);
   }
 }

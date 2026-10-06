@@ -43,11 +43,12 @@ export class RoutingService {
     try {
       const res = await fetch(url);
       if (!res.ok) {
-        this.logger.warn(`OSRM responded ${res.status} for ${url}`);
-        return null;
+        throw new Error(`OSRM status ${res.status}`);
       }
       const data: any = await res.json();
-      if (data.code !== 'Ok' || !data.routes?.length) return null;
+      if (data.code !== 'Ok' || !data.routes?.length) {
+        throw new Error(`OSRM response code: ${data.code}`);
+      }
 
       const route = data.routes[0];
       const steps: RouteStep[] = (route.legs?.[0]?.steps || []).map((s: any) => ({
