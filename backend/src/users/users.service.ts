@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { auth } from '../auth/better-auth.instance';
 import { toOrgRole } from '../auth/roles';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -62,10 +63,17 @@ export class UsersService {
       data: { phoneNumber: cleanPhone, username: cleanPhone, name: dto.name },
     });
 
-    if (dto.role === 'AGENT') {
+    if (dto.role === 'AGENT' || dto.vehicle) {
       const existingProfile = await this.prisma.agentProfile.findUnique({ where: { userId } });
       if (!existingProfile) {
-        await this.prisma.agentProfile.create({ data: { userId } });
+        await this.prisma.agentProfile.create({
+          data: { userId, vehicle: dto.vehicle || null },
+        });
+      } else if (dto.vehicle) {
+        await this.prisma.agentProfile.update({
+          where: { userId },
+          data: { vehicle: dto.vehicle },
+        });
       }
     }
 
@@ -76,8 +84,15 @@ export class UsersService {
     const members = await this.prisma.member.findMany({
       where: { organizationId: workspaceId },
       include: { user: { include: { agentProfile: true } } },
+      orderBy: { createdAt: 'desc' },
     });
-    return members.map((m) => ({ ...m.user, orgRole: m.role }));
+    return members.map((m) => ({
+      ...m.user,
+      phone: m.user.phoneNumber || m.user.username || '',
+      orgRole: m.role,
+      vehicle: m.user.agentProfile?.vehicle || null,
+      isOnline: m.user.agentProfile?.isOnline || false,
+    }));
   }
 
   async findOne(workspaceId: string, userId: string) {
@@ -86,13 +101,95 @@ export class UsersService {
       include: { user: { include: { agentProfile: true } } },
     });
     if (!member) throw new NotFoundException('User not found in this workspace');
-    return { ...member.user, orgRole: member.role };
+    return {
+      ...member.user,
+      phone: member.user.phoneNumber || member.user.username || '',
+      orgRole: member.role,
+      vehicle: member.user.agentProfile?.vehicle || null,
+      isOnline: member.user.agentProfile?.isOnline || false,
+    };
   }
 
-  /** Suspends a teammate's access without deleting their history. */
+  /**
+   * Updates teammate profile, role, phone/username or vehicle assignment.
+   */
+  async update(workspaceId: string, userId: string, dto: UpdateUserDto) {
+    await this.findOne(workspaceId, userId);
+
+    const updateUserData: any = {};
+    if (dto.name && dto.name.trim()) {
+      updateUserData.name = dto.name.trim();
+    }
+    if (dto.phone) {
+      const cleanPhone = dto.phone.replace(/[\s\-\+\(\)]/g, '');
+      if (cleanPhone.length >= 6) {
+        const existingWithPhone = await this.prisma.user.findFirst({
+          where: {
+            id: { not: userId },
+            OR: [
+              { phoneNumber: cleanPhone },
+              { username: cleanPhone },
+            ],
+          },
+        });
+        if (existingWithPhone) {
+          throw new ConflictException(`Phone number ${dto.phone} is already assigned to another user.`);
+        }
+        updateUserData.phoneNumber = cleanPhone;
+        updateUserData.username = cleanPhone;
+      }
+    }
+    if (dto.email) {
+      updateUserData.email = dto.email.trim();
+    }
+
+    if (Object.keys(updateUserData).length > 0) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: updateUserData,
+      });
+    }
+
+    if (dto.role) {
+      const orgRole = toOrgRole(dto.role as any);
+      await this.prisma.member.updateMany({
+        where: { organizationId: workspaceId, userId },
+        data: { role: orgRole },
+      });
+    }
+
+    if (dto.vehicle !== undefined) {
+      await this.prisma.agentProfile.upsert({
+        where: { userId },
+        create: { userId, vehicle: dto.vehicle || null },
+        update: { vehicle: dto.vehicle || null },
+      });
+    }
+
+    if (dto.password && dto.password.length >= 6) {
+      try {
+        await (auth.api as any).setUserPassword({
+          body: { userId, newPassword: dto.password },
+        });
+      } catch (err) {
+        console.warn('Could not update password via auth.api:', err);
+      }
+    }
+
+    return this.findOne(workspaceId, userId);
+  }
+
+  /** Removes a teammate's membership from the workspace and suspends access. */
   async remove(workspaceId: string, userId: string) {
     await this.findOne(workspaceId, userId);
-    await auth.api.banUser({ body: { userId, banReason: 'Suspended by workspace owner' } as any });
+    await this.prisma.member.deleteMany({
+      where: { organizationId: workspaceId, userId },
+    });
+    try {
+      await auth.api.banUser({ body: { userId, banReason: 'Removed by workspace owner' } as any });
+    } catch {
+      // ignore ban error if already handled
+    }
     return { success: true };
   }
 }
