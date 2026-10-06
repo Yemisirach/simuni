@@ -173,9 +173,13 @@ export default function CustomersPage() {
     }
   };
 
-  // Bulk Seed Tagged Addis Ababa Locations for all workspaces (1,000 locations)
+  // Progress message for multi-batch seed sync
+  const [syncProgress, setSyncProgress] = useState<string>('');
+
+  // Bulk Seed Tagged Addis Ababa Locations for all workspaces in safe, fast batches
   const handleSeedAddisLocations = async () => {
     setSubmitting(true);
+    setSyncProgress('Preparing location presets...');
     try {
       const formatted = ADDIS_ABABA_1000_LOCATIONS.map((loc) => ({
         name: loc.name,
@@ -186,18 +190,30 @@ export default function CustomersPage() {
         lng: loc.lng,
       }));
 
-      const res = await fetchApi<any>('/customers/seed-addis', {
-        method: 'POST',
-        body: JSON.stringify({
-          locations: formatted,
-          applyToAllWorkspaces,
-        }),
-      });
+      const BATCH_SIZE = 500;
+      const totalBatches = Math.ceil(formatted.length / BATCH_SIZE);
+      let totalCreated = 0;
+      let targetWsCount = 1;
+
+      for (let i = 0; i < formatted.length; i += BATCH_SIZE) {
+        const chunk = formatted.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        setSyncProgress(`Syncing batch ${batchNum}/${totalBatches} (${chunk.length} locations)...`);
+
+        const res = await fetchApi<any>('/customers/seed-addis', {
+          method: 'POST',
+          body: JSON.stringify({
+            locations: chunk,
+            applyToAllWorkspaces,
+          }),
+        });
+
+        totalCreated += res.createdCount || 0;
+        if (res.targetWorkspacesCount) targetWsCount = res.targetWorkspacesCount;
+      }
 
       alert(
-        `✅ Successfully synced ${res.createdCount || formatted.length} locations across ${
-          res.targetWorkspacesCount || 1
-        } workspace(s)!`
+        `✅ Successfully synced ${formatted.length} locations (${totalCreated} new/updated) across ${targetWsCount} workspace(s)!`
       );
       setShowSeedModal(false);
       await loadCustomers();
@@ -205,6 +221,7 @@ export default function CustomersPage() {
       alert(err.message || 'Failed to seed Addis Ababa locations');
     } finally {
       setSubmitting(false);
+      setSyncProgress('');
     }
   };
 
@@ -694,7 +711,7 @@ export default function CustomersPage() {
                 disabled={submitting}
                 className="bg-accent text-primary-darker font-bold px-5 py-2 rounded-lg text-sm hover:bg-accent-light transition-colors disabled:opacity-50 shadow-sm"
               >
-                {submitting ? 'Syncing...' : `Sync ${ADDIS_ABABA_TAGGED_LOCATIONS.length} Locations`}
+                {submitting ? (syncProgress || 'Syncing...') : `Sync ${ADDIS_ABABA_1000_LOCATIONS.length} Locations`}
               </button>
             </div>
           </div>

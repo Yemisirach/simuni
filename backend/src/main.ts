@@ -12,15 +12,23 @@ async function bootstrap() {
     bodyParser: false,
   });
 
+  // Enable CORS first so that all responses (including 4xx/5xx errors) include proper CORS headers
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With,workspace-id',
+  });
+
+  // Body parser with 50MB limit to support bulk geospatial datasets and imports
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/v1/auth')) {
       next();
     } else {
-      express.json()(req, res, next);
+      express.json({ limit: '50mb' })(req, res, next);
     }
   });
-
-  app.enableCors({ origin: true, credentials: true });
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

@@ -255,31 +255,87 @@ export class CustomersService {
 
     let createdCount = 0;
     for (const wsId of targetWsIds) {
-      for (const loc of locations) {
-        // Upsert or avoid exact duplicates by name within workspace
-        const existing = await this.prisma.customer.findFirst({
-          where: { workspaceId: wsId, name: loc.name },
-        });
+      // 1. Fetch all existing customer records in workspace in a single query
+      const existingList = await this.prisma.customer.findMany({
+        where: { workspaceId: wsId },
+        select: { id: true, name: true, lat: true, lng: true },
+      });
+      const existingMap = new Map(existingList.map((c) => [c.name, c]));
 
+      const toCreate: Array<{
+        workspaceId: string;
+        name: string;
+        phone: string;
+        address: string;
+        category: string;
+        lat: number;
+        lng: number;
+      }> = [];
+
+      const toUpdate: Array<{
+        id: string;
+        lat: number;
+        lng: number;
+        address?: string;
+      }> = [];
+
+      for (const loc of locations) {
+        const existing = existingMap.get(loc.name);
         if (!existing) {
-          await this.prisma.customer.create({
-            data: {
-              workspaceId: wsId,
-              name: loc.name,
-              phone: loc.phone || '0911000000',
-              address: loc.address || 'Addis Ababa',
-              category: loc.category || 'Retailer',
+          toCreate.push({
+            workspaceId: wsId,
+            name: loc.name,
+            phone: loc.phone || '0911000000',
+            address: loc.address || 'Addis Ababa',
+            category: loc.category || 'Retailer',
+            lat: loc.lat,
+            lng: loc.lng,
+          });
+        } else {
+          // Only update if coordinates differ
+          const latDiff = existing.lat != null ? Math.abs(existing.lat - loc.lat) : 1;
+          const lngDiff = existing.lng != null ? Math.abs(existing.lng - loc.lng) : 1;
+          if (latDiff > 0.00005 || lngDiff > 0.00005) {
+            toUpdate.push({
+              id: existing.id,
               lat: loc.lat,
               lng: loc.lng,
-            },
+              address: loc.address,
+            });
+          }
+        }
+      }
+
+      // 2. Fast bulk insert for new customers
+      if (toCreate.length > 0) {
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < toCreate.length; i += BATCH_SIZE) {
+          const chunk = toCreate.slice(i, i + BATCH_SIZE);
+          await this.prisma.customer.createMany({
+            data: chunk,
+            skipDuplicates: true,
           });
-          createdCount++;
-        } else {
-          // Update coordinates to authentic 2D dispersed positions
-          await this.prisma.customer.update({
-            where: { id: existing.id },
-            data: { lat: loc.lat, lng: loc.lng, address: loc.address || existing.address },
-          });
+          createdCount += chunk.length;
+        }
+      }
+
+      // 3. Fast concurrent batch update for existing customers
+      if (toUpdate.length > 0) {
+        const UPDATE_BATCH = 40;
+        for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
+          const chunk = toUpdate.slice(i, i + UPDATE_BATCH);
+          await Promise.all(
+            chunk.map((item) =>
+              this.prisma.customer.update({
+                where: { id: item.id },
+                data: {
+                  lat: item.lat,
+                  lng: item.lng,
+                  address: item.address,
+                },
+              }),
+            ),
+          );
         }
       }
     }
