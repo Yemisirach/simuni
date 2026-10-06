@@ -17,7 +17,7 @@ async function bootstrap() {
     origin: true,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With,workspace-id',
+    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With,workspace-id,Cache-Control,Pragma,Expires',
   });
 
   // Body parser with 50MB limit to support bulk geospatial datasets and imports
