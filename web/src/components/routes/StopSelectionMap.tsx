@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Rectangle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -509,7 +509,7 @@ export default function StopSelectionMap({
             <span className="text-[11px] font-bold text-text-muted mr-0.5">Focus:</span>
             {[
               { name: '📍 Central Addis', center: [ADDIS_ABABA_CENTRAL_LOCATION.lat, ADDIS_ABABA_CENTRAL_LOCATION.lng] as [number, number], zoom: 13 },
-              { name: 'Yeka Abado (Full Blocks)', center: [9.0350, 38.8450] as [number, number], zoom: 16 },
+              { name: 'Yeka Abado (Full Blocks)', center: [9.0665, 38.8720] as [number, number], zoom: 16 },
               { name: 'Mercato', center: [9.0305, 38.7360] as [number, number], zoom: 15 },
               { name: 'Bole', center: [8.9950, 38.7880] as [number, number], zoom: 15 },
               { name: 'Lebu / Jemo', center: [8.9600, 38.7200] as [number, number], zoom: 15 },

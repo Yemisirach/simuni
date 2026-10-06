@@ -23,10 +23,10 @@ const ZONE_ANCHORS: ZoneAnchor[] = [
     zone: 'Yeka Abado Condominium & Core Blocks',
     subCity: 'Yeka',
     sector: 'YEKA',
-    centerLat: 9.0350,
-    centerLng: 38.8450,
-    latSpan: 0.035,
-    lngSpan: 0.040,
+    centerLat: 9.0665,
+    centerLng: 38.8720,
+    latSpan: 0.015,
+    lngSpan: 0.020,
     types: [
       {
         type: 'RETAILER',
