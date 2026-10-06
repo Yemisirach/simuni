@@ -111,21 +111,31 @@ function MapEventsHandler({
   onMapClick: (latlng: L.LatLng) => void;
   onViewportChange: (zoom: number, bounds: L.LatLngBounds) => void;
 }) {
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
+
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
+
   const map = useMapEvents({
     click(e) {
-      onMapClick(e.latlng);
+      onMapClickRef.current(e.latlng);
     },
     zoomend() {
-      onViewportChange(map.getZoom(), map.getBounds());
+      onViewportChangeRef.current(map.getZoom(), map.getBounds());
     },
     moveend() {
-      onViewportChange(map.getZoom(), map.getBounds());
+      onViewportChangeRef.current(map.getZoom(), map.getBounds());
     },
   });
 
+  const initializedRef = useRef(false);
   useEffect(() => {
-    onViewportChange(map.getZoom(), map.getBounds());
-  }, [map, onViewportChange]);
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      onViewportChangeRef.current(map.getZoom(), map.getBounds());
+    }
+  }, [map]);
 
   return null;
 }
@@ -235,8 +245,19 @@ export default function StopSelectionMap({
 
   // Viewport change handler
   const handleViewportChange = useCallback((zoom: number, bounds: L.LatLngBounds) => {
-    setCurrentZoom(zoom);
-    setCurrentBounds(bounds);
+    setCurrentZoom((prevZoom) => (prevZoom !== zoom ? zoom : prevZoom));
+    setCurrentBounds((prevBounds) => {
+      if (
+        prevBounds &&
+        Math.abs(prevBounds.getSouth() - bounds.getSouth()) < 0.0001 &&
+        Math.abs(prevBounds.getNorth() - bounds.getNorth()) < 0.0001 &&
+        Math.abs(prevBounds.getWest() - bounds.getWest()) < 0.0001 &&
+        Math.abs(prevBounds.getEast() - bounds.getEast()) < 0.0001
+      ) {
+        return prevBounds;
+      }
+      return bounds;
+    });
     triggerViewportFetch(zoom, bounds);
   }, [triggerViewportFetch]);
 
