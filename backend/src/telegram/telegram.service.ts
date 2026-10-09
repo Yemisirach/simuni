@@ -212,8 +212,14 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
             this.logger.log('Telegram bot started (long polling)');
           })
           .catch((err) => {
-            this.logger.error(`Telegram bot polling error: ${(err as Error).message}. Retrying in 5s...`);
-            setTimeout(startPolling, 5000);
+            const isConflict = String(err?.message || err).includes('409');
+            const retryMs = isConflict ? 30000 : 10000;
+            if (isConflict) {
+              this.logger.warn(`Telegram bot conflict: Another instance is polling. Waiting ${retryMs / 1000}s before checking again...`);
+            } else {
+              this.logger.error(`Telegram bot polling error: ${(err as Error).message}. Retrying in ${retryMs / 1000}s...`);
+            }
+            setTimeout(startPolling, retryMs);
           });
       };
 
